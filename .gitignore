@@ -53,3 +53,4 @@ build/
 *.zip
 *.sha1
 build/
+web/my_app.zip
