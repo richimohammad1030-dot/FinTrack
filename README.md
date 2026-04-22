@@ -1,16 +1,28 @@
-# myapp
+# FinTrack: Personal Wealth & Expense Tracker
 
-A new Flutter project.
+FinTrack (Pro-Tracker) is a lightweight, high-performance mobile application built with Flutter. It is designed for individuals who manage multiple income streams—such as professional salaries, freelance contracts, and trading profits—providing a streamlined way to monitor financial health with precision.
 
-## Getting Started
+## 🚀 Key Features
+* **Multi-Source Management**: Easily categorize and track income from various sources and daily expenditures.
+* **Smart Currency Formatting**: Real-time input masking with thousand separators (e.g., Rp 20.000) to ensure data accuracy and readability.
+* **Customized Categories**: Tailored expense categories including Meals, Entertainment, Monthly Bills (Rent/Data), Transport, Health, and Shopping.
+* **Flexible Metadata**: Optional "Notes" field for adding specific context to any transaction.
+* **Local-First Architecture**: Powered by SQLite for secure, offline data storage directly on the device—no third-party servers involved.
+* **Premium Dark UI**: A modern, high-contrast interface featuring a Deep Black and Emerald Green aesthetic.
 
-This project is a starting point for a Flutter application.
+## 🛠️ Tech Stack
+* **Framework**: Flutter (Dart)
+* **Database**: SQLite (via `sqflite`)
+* **State Management**: Provider (for reactive and efficient UI updates)
+* **Design System**: Material Design 3 with custom branding.
 
-A few resources to get you started if this is your first Flutter project:
+## 📱 App Preview
+*(Upload your screenshots to the 'assets' folder and link them here for maximum impact)*
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 📂 Project Structure
+* `lib/models/`: Data structures and transaction schemas.
+* `lib/database/`: SQLite helper classes and CRUD logic.
+* `lib/screens/`: Feature-rich UI components and navigation.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+*Developed as a personal tool for financial oversight and a demonstration of modern mobile development capabilities.*
