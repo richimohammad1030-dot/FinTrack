@@ -47,3 +47,9 @@ app.*.map.json
 *.zip
 *.b64
 build/
+# File besar - tidak perlu di-upload ke GitHub
+*.apk
+*.b64
+*.zip
+*.sha1
+build/
