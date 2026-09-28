@@ -1,28 +1,76 @@
-# FinTrack: Personal Wealth & Expense Tracker
+# FinTrack — Tahu ke mana gajimu pergi
 
-FinTrack (Pro-Tracker) is a lightweight, high-performance mobile application built with Flutter. It is designed for individuals who manage multiple income streams—such as professional salaries, freelance contracts, and trading profits—providing a streamlined way to monitor financial health with precision.
+FinTrack adalah aplikasi Android (Flutter) untuk mencatat pemasukan & pengeluaran pribadi dengan
+pendekatan **pos anggaran per periode gajian**. Tujuannya sederhana: gaji tidak lagi "habis entah ke mana".
 
-## Key Features
-* **Multi-Source Management**: Easily categorize and track income from various sources and daily expenditures.
-* **Smart Currency Formatting**: Real-time input masking with thousand separators (e.g., Rp 20.000) to ensure data accuracy and readability.
-* **Customized Categories**: Tailored expense categories including Meals, Entertainment, Monthly Bills (Rent/Data), Transport, Health, and Shopping.
-* **Flexible Metadata**: Optional "Notes" field for adding specific context to any transaction.
-* **Local-First Architecture**: Powered by SQLite for secure, offline data storage directly on the device—no third-party servers involved.
-* **Premium Dark UI**: A modern, high-contrast interface featuring a Deep Black and Emerald Green aesthetic.
+| Beranda | Pos anggaran | Laporan | Catat |
+|---|---|---|---|
+| ![Beranda](docs/screenshots/01-beranda.png) | ![Pos](docs/screenshots/03-pos.png) | ![Laporan](docs/screenshots/04-laporan.png) | ![Catat](docs/screenshots/07-catat.png) |
 
-## Tech Stack
-* **Framework**: Flutter (Dart)
-* **Database**: SQLite (via `sqflite`)
-* **State Management**: Provider (for reactive and efficient UI updates)
-* **Design System**: Material Design 3 with custom branding.
+## Fitur
 
-## App Preview
-*(Upload your screenshots to the 'assets' folder and link them here for maximum impact)*
+- **Siklus gajian** — periode dihitung dari tanggal gajian (mis. 25 Sep – 24 Okt), bukan tanggal 1.
+- **Pos anggaran & Bagi Gaji** — bagi gaji ke pos (Tabungan, Makan, Tagihan, Transport, …) dengan
+  tombol *Saran otomatis*. Tabungan disisihkan di awal dan tidak dihitung sebagai pengeluaran.
+- **Batas harian otomatis** — "Aman dipakai hari ini" = (anggaran − yang sudah terpakai) ÷ sisa hari
+  sampai gajian. Boros hari ini → jatah besok mengecil; hemat → jatah besok naik. Bisa juga diset manual.
+- **Peringatan** — notifikasi & tampilan saat batas harian atau batas pos mencapai 80% dan 100%.
+- **Catat cepat** — nominal (titik ribuan otomatis) → pos → simpan. Bisa diedit, geser untuk hapus
+  (dengan *Urungkan*).
+- **Multi dompet** — Tunai, rekening bank, e-wallet, dengan saldo masing-masing dan transfer antar dompet.
+- **Transaksi rutin** — kos, internet, cicilan tercatat otomatis tiap bulan, atau diingatkan untuk
+  tagihan yang nominalnya berubah (listrik, air).
+- **Target tabungan** — progres, tenggat, dan saran setoran per bulan.
+- **Laporan** — donat per pos, grafik pengeluaran harian vs jatah, perbandingan dengan periode lalu,
+  rasio menabung, pengeluaran terbesar.
+- **Aman** — kunci PIN 6 digit (hash + salt di Android Keystore), sidik jari, kunci otomatis saat
+  ditinggal, mode sembunyikan nominal. Semua data hanya di HP (SQLite), tanpa server.
+- **Backup / restore** ke file JSON (bisa disimpan ke Google Drive).
+- Tema terang & gelap, bahasa Indonesia, font Plus Jakarta Sans.
 
-## Project Structure
-* `lib/models/`: Data structures and transaction schemas.
-* `lib/database/`: SQLite helper classes and CRUD logic.
-* `lib/screens/`: Feature-rich UI components and navigation.
+## Struktur kode
 
----
-*Developed as a personal tool for financial oversight and a demonstration of modern mobile development capabilities.*
+```
+lib/
+  main.dart, app.dart        # inisialisasi, tema, kunci PIN, onboarding
+  core/                      # tema, format rupiah/tanggal, katalog ikon & warna
+  data/                      # model, database SQLite, pos bawaan
+  logic/                     # periode gajian, anggaran & peringatan, transaksi rutin (murni, teruji)
+  state/                     # FinanceStore (state utama), Settings
+  services/                  # keamanan (PIN/biometrik), notifikasi
+  ui/                        # layar: home, history, budget, reports, more, onboarding, lock, txn
+test/                        # unit test logika, test database/store, widget test
+docs/screenshots/            # tangkapan layar (dibuat dari test/screenshots_test.dart)
+```
+
+## Menjalankan & build
+
+```bash
+flutter pub get
+flutter test                 # semua pengujian
+flutter run                  # jalankan di HP/emulator
+flutter build apk --release  # APK di build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Kunci rilis (penting)
+
+APK rilis ditandatangani dengan kunci dari `android/key.properties` + file `.jks`. Keduanya **tidak
+di-commit** (sudah di `.gitignore`). Simpan baik-baik: update aplikasi harus ditandatangani dengan kunci
+yang sama, kalau tidak Android menolak update dan kamu harus uninstall (data hilang kecuali sudah backup).
+
+Isi `android/key.properties`:
+
+```
+storePassword=...
+keyPassword=...
+keyAlias=fintrack
+storeFile=fintrack-release.jks
+```
+
+Tanpa file ini, build rilis memakai kunci debug.
+
+### Screenshot
+
+```bash
+SCREENSHOTS=1 flutter test test/screenshots_test.dart --update-goldens
+```
