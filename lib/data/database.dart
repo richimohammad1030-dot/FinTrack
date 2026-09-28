@@ -12,7 +12,7 @@ class AppDatabase {
   final Database db;
 
   static const fileName = 'fintrack.db';
-  static const version = 2;
+  static const version = 3;
 
   /// Buka database di penyimpanan aplikasi. [path] bisa diisi
   /// `inMemoryDatabasePath` untuk pengujian.
@@ -35,7 +35,7 @@ class AppDatabase {
   }
 
   // ── Skema ──────────────────────────────────────────────────────────────
-  // v1: FinTrack 2.0 · v2: hutang/piutang (tabel debts, tipe debt_in/debt_out)
+  // v1: FinTrack 2.0 · v2: hutang/piutang · v3: kolom categories.daily
 
   static const _debtsSql = '''
       CREATE TABLE debts (
@@ -110,6 +110,7 @@ class AppDatabase {
         color INTEGER NOT NULL,
         monthly_limit INTEGER NOT NULL DEFAULT 0,
         is_saving INTEGER NOT NULL DEFAULT 0,
+        daily INTEGER NOT NULL DEFAULT 1,
         archived INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL DEFAULT 0
       )''');
@@ -158,6 +159,13 @@ class AppDatabase {
       final b = db.batch();
       _indexes(b);
       await b.commit(noResult: true);
+    }
+    if (oldVersion < 3) {
+      // v3: pos bulanan (kos, tagihan, dll.) tidak masuk jatah harian.
+      await db.execute('ALTER TABLE categories ADD COLUMN daily INTEGER NOT NULL DEFAULT 1');
+      await db.update('categories', {'daily': 0},
+          where: "kind = 'expense' AND name IN (${List.filled(nonDailyDefaults.length, '?').join(',')})",
+          whereArgs: nonDailyDefaults.toList());
     }
   }
 

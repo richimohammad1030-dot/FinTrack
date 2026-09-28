@@ -48,6 +48,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SectionHeader('Ke mana uangmu pergi?'),
           _WhereItWent(summary: s, previous: prev),
           const SectionHeader('Pengeluaran harian'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text('Hanya pos harian. Pos bulanan (kos, tagihan, dll.) dipantau lewat batas posnya.',
+                style: context.text.bodySmall),
+          ),
           _DailyChart(summary: s, categories: store.categories, now: store.now),
           _Insights(summary: s, previous: prev, now: store.now),
           if (s.incomeByCategory.isNotEmpty) ...[
@@ -455,10 +460,11 @@ class _Insights extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = summary;
-    if (s.expense <= 0) return const SizedBox.shrink();
+    final dailyTotal = s.daily.values.fold(0, (a, b) => a + b);
+    if (dailyTotal <= 0) return const SizedBox.shrink();
     final p = context.palette;
     final elapsed = s.period.contains(now) ? s.period.dayIndex(now) : s.period.totalDays;
-    final avg = s.expense ~/ math.max(1, elapsed);
+    final avg = dailyTotal ~/ math.max(1, elapsed);
     final worst = s.daily.entries.reduce((a, b) => a.value >= b.value ? a : b);
 
     // Bandingkan dengan periode lalu pada hari yang sama (adil untuk periode berjalan).
@@ -468,12 +474,12 @@ class _Insights extends StatelessWidget {
     });
 
     final items = <(IconData, Color, String)>[
-      (Icons.calendar_view_day_rounded, context.colors.primary, 'Rata-rata ${rupiah(avg)} per hari (termasuk tagihan)'),
+      (Icons.calendar_view_day_rounded, context.colors.primary, 'Rata-rata pengeluaran harian ${rupiah(avg)} per hari'),
       (Icons.local_fire_department_rounded, p.expense,
           'Paling boros: ${fmtRelativeDay(worst.key, now: now)} (${rupiah(worst.value)})'),
       if (prevSameDays > 0)
         () {
-          final d = (s.expense - prevSameDays) / prevSameDays;
+          final d = (dailyTotal - prevSameDays) / prevSameDays;
           final up = d > 0;
           return (
             up ? Icons.trending_up_rounded : Icons.trending_down_rounded,

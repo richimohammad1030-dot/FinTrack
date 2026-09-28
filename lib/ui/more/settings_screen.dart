@@ -237,7 +237,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 10),
           Center(
             child: Text(
-              'KAIT 2.1 · data tersimpan hanya di HP ini\n'
+              'KAIT 2.1.1 · data tersimpan hanya di HP ini\n'
               'Kelola Arus Keuangan · Kelola Aset & Income · Kelola Duit',
               style: context.text.bodySmall,
               textAlign: TextAlign.center,

@@ -152,11 +152,13 @@ class _PosCard extends StatelessWidget {
               : 'Kurang ${rupiah(status.limit - status.spent)} dari target setoran')
           : 'Belum ada target setoran';
     } else if (status.limit <= 0) {
-      info = 'Tanpa batas';
+      info = c.countsDaily ? 'Tanpa batas' : 'Pos bulanan · tanpa batas';
     } else if (status.remaining < 0) {
       info = 'Lewat ${rupiah(-status.remaining)}';
     } else {
-      info = 'Sisa ${rupiah(status.remaining)} · ≈${compactRupiah(status.perDayLeft)}/hari';
+      info = c.countsDaily
+          ? 'Sisa ${rupiah(status.remaining)} · ≈${compactRupiah(status.perDayLeft)}/hari'
+          : 'Sisa ${rupiah(status.remaining)} · pos bulanan';
     }
 
     return Padding(
@@ -337,6 +339,7 @@ class _PosEditorState extends State<_PosEditor> {
   late String _icon;
   late int _color;
   late bool _saving;
+  late bool _daily;
 
   bool get _isExpense => widget.kind == PosKind.expense;
 
@@ -349,6 +352,7 @@ class _PosEditorState extends State<_PosEditor> {
     _icon = e?.icon ?? 'category';
     _color = e?.color ?? 0xFF10B981;
     _saving = e?.isSaving ?? false;
+    _daily = e?.countsDaily ?? true;
   }
 
   @override
@@ -368,6 +372,7 @@ class _PosEditorState extends State<_PosEditor> {
       color: _color,
       monthlyLimit: _isExpense ? parseDigits(_limit.text) : 0,
       isSaving: _isExpense && _saving,
+      countsDaily: _daily,
     ));
     if (mounted) Navigator.pop(context);
   }
@@ -440,6 +445,17 @@ class _PosEditorState extends State<_PosEditor> {
                     value: _saving,
                     onChanged: (v) => setState(() => _saving = v),
                   ),
+                  if (!_saving)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Masuk jatah harian'),
+                      subtitle: Text(_daily
+                          ? 'Untuk pengeluaran sehari-hari (makan, transport, jajan)'
+                          : 'Pos bulanan: tidak mengurangi jatah harian, cukup dipantau batas posnya '
+                              '(cocok untuk kos, token listrik, belanja bulanan)'),
+                      value: _daily,
+                      onChanged: (v) => setState(() => _daily = v),
+                    ),
                 ],
                 const SizedBox(height: 12),
                 Text('Warna', style: context.text.labelLarge),

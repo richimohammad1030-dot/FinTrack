@@ -16,6 +16,10 @@ const suggestedSplit = <String, int>{
   'Lainnya': 3,
 };
 
+/// Pos bawaan yang TIDAK dihitung di jatah harian: pengeluaran bulanan /
+/// sesekali yang nominalnya besar (kos, token listrik, belanja bulanan…).
+const nonDailyDefaults = {'Tagihan & Kos', 'Kebutuhan Rumah', 'Kesehatan', 'Keluarga & Sosial'};
+
 List<Pos> defaultCategories() {
   var order = 0;
   Pos e(String name, String icon, int color, {bool saving = false}) => Pos(
@@ -24,6 +28,7 @@ List<Pos> defaultCategories() {
         icon: icon,
         color: color,
         isSaving: saving,
+        countsDaily: !nonDailyDefaults.contains(name),
         sortOrder: order++,
       );
   Pos i(String name, String icon, int color) => Pos(

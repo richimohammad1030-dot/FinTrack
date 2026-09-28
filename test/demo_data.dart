@@ -69,7 +69,7 @@ Future<void> seedDemo(FinanceStore store) async {
   await e(27, 9, 420000, 'Hiburan & Jajan', bca, 'Nonton + jajan', hour: 16);
   await e(27, 9, 150000, 'Transportasi', cash, 'Bensin', hour: 8);
   await e(28, 9, 32000, 'Makan & Minum', cash, 'Sarapan', hour: 7);
-  await e(28, 9, 48000, 'Makan & Minum', gopay, 'Makan siang', hour: 12);
+  await e(28, 9, 28000, 'Makan & Minum', gopay, 'Makan siang', hour: 12);
   await e(28, 9, 18000, 'Transportasi', gopay, 'Ojol ke kantor', hour: 8);
 
   await store.saveRecurring(Recurring(

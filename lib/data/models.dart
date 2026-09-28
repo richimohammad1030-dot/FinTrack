@@ -134,6 +134,10 @@ class Pos {
 
   /// Pos tabungan: uangnya disisihkan, bukan "dihabiskan".
   final bool isSaving;
+
+  /// Ikut dihitung di jatah harian? Pos bulanan (kos, tagihan, belanja
+  /// bulanan) sebaiknya false supaya tidak "menghabiskan" jatah harian.
+  final bool countsDaily;
   final bool archived;
   final int sortOrder;
 
@@ -145,9 +149,13 @@ class Pos {
     this.color = 0xFF64748B,
     this.monthlyLimit = 0,
     this.isSaving = false,
+    this.countsDaily = true,
     this.archived = false,
     this.sortOrder = 0,
   });
+
+  /// Pengeluaran pos ini masuk hitungan jatah harian.
+  bool get isDaily => isExpense && !isSaving && countsDaily;
 
   bool get isExpense => kind == PosKind.expense;
   bool get hasLimit => monthlyLimit > 0;
@@ -160,6 +168,7 @@ class Pos {
         color: m['color'] as int,
         monthlyLimit: m['monthly_limit'] as int? ?? 0,
         isSaving: _b(m['is_saving']),
+        countsDaily: m['daily'] == null ? true : _b(m['daily']),
         archived: _b(m['archived']),
         sortOrder: m['sort_order'] as int? ?? 0,
       );
@@ -172,6 +181,7 @@ class Pos {
         'color': color,
         'monthly_limit': monthlyLimit,
         'is_saving': isSaving ? 1 : 0,
+        'daily': countsDaily ? 1 : 0,
         'archived': archived ? 1 : 0,
         'sort_order': sortOrder,
       };
@@ -184,6 +194,7 @@ class Pos {
     int? color,
     int? monthlyLimit,
     bool? isSaving,
+    bool? countsDaily,
     bool? archived,
     int? sortOrder,
   }) =>
@@ -195,6 +206,7 @@ class Pos {
         color: color ?? this.color,
         monthlyLimit: monthlyLimit ?? this.monthlyLimit,
         isSaving: isSaving ?? this.isSaving,
+        countsDaily: countsDaily ?? this.countsDaily,
         archived: archived ?? this.archived,
         sortOrder: sortOrder ?? this.sortOrder,
       );

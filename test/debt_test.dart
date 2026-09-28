@@ -180,7 +180,16 @@ void main() {
         ));
     await v1.close();
 
+    // Tambah satu pos bernama "Tagihan & Kos" (v1) → setelah migrasi v3 jadi pos bulanan.
+    final raw = await databaseFactory.openDatabase(path, options: OpenDatabaseOptions(version: 1));
+    await raw.insert('categories', {'name': 'Tagihan & Kos', 'kind': 'expense', 'icon': 'home', 'color': 1});
+    await raw.insert('categories', {'name': 'Makan & Minum', 'kind': 'expense', 'icon': 'food', 'color': 1});
+    await raw.close();
+
     final db = await AppDatabase.open(path: path);
+    final cats = await db.categories();
+    expect(cats.firstWhere((c) => c.name == 'Tagihan & Kos').countsDaily, isFalse);
+    expect(cats.firstWhere((c) => c.name == 'Makan & Minum').countsDaily, isTrue);
     expect((await db.transactions()).single.note, 'kopi');
     expect((await db.recurrings()).single.title, 'Kos');
     final debtId = await db.insertDebt(Debt(kind: DebtKind.payable, name: 'Budi', startDate: now));

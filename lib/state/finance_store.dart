@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../core/format.dart';
 import '../data/database.dart';
 import '../data/models.dart';
+import '../data/seed.dart';
 import '../logic/budget.dart';
 import '../logic/period.dart';
 import '../logic/recurring.dart';
@@ -107,7 +108,11 @@ class FinanceStore extends ChangeNotifier {
   final _summaryCache = <PayPeriod, PeriodSummary>{};
 
   PeriodSummary summaryFor(PayPeriod p) =>
-      _summaryCache[p] ??= PeriodSummary.compute(_txns, p, savingCategoryIds);
+      _summaryCache[p] ??= PeriodSummary.compute(_txns, p, savingCategoryIds, nonDailyIds: nonDailyCategoryIds);
+
+  /// Pos pengeluaran yang tidak dihitung di jatah harian.
+  Set<int> get nonDailyCategoryIds =>
+      {for (final c in _categories) if (c.isExpense && !c.isSaving && !c.countsDaily && c.id != null) c.id!};
 
   PeriodSummary get currentSummary => summaryFor(currentPeriod);
 
@@ -683,6 +688,10 @@ class FinanceStore extends ChangeNotifier {
           for (final row in (e.value as List)) Map<String, Object?>.from(row as Map),
         ],
     };
+    // Backup lama belum punya kolom "daily": pakai pengaturan bawaan.
+    for (final row in data['categories'] ?? const <Map<String, Object?>>[]) {
+      row.putIfAbsent('daily', () => row['kind'] == 'expense' && nonDailyDefaults.contains(row['name']) ? 0 : 1);
+    }
     await db.replaceAll(data);
     final s = decoded['settings'];
     if (s is Map) {

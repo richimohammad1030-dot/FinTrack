@@ -17,8 +17,10 @@ KAIT adalah aplikasi Android (Flutter) untuk mencatat pemasukan & pengeluaran pr
 - **Siklus gajian** — periode dihitung dari tanggal gajian (mis. 25 Sep – 24 Okt), bukan tanggal 1.
 - **Pos anggaran & Bagi Gaji** — bagi gaji ke pos (Tabungan, Makan, Tagihan, Transport, …) dengan
   tombol *Saran otomatis*. Tabungan disisihkan di awal dan tidak dihitung sebagai pengeluaran.
-- **Batas harian otomatis** — "Aman dipakai hari ini" = (anggaran − yang sudah terpakai) ÷ sisa hari
+- **Batas harian otomatis** — "Aman dipakai hari ini" = (anggaran pos harian − yang sudah terpakai) ÷ sisa hari
   sampai gajian. Boros hari ini → jatah besok mengecil; hemat → jatah besok naik. Bisa juga diset manual.
+  Pos bulanan (kos, tagihan, belanja bulanan, dll.) tidak memotong jatah harian; cukup dipantau batas posnya.
+  Setiap pos bisa diatur lewat saklar *Masuk jatah harian*.
 - **Peringatan** — notifikasi & tampilan saat batas harian atau batas pos mencapai 80% dan 100%.
 - **Catat cepat** — nominal (titik ribuan otomatis) → pos → simpan. Bisa diedit, geser untuk hapus
   (dengan *Urungkan*).

@@ -1,7 +1,7 @@
 name: kait
 description: "KAIT — Kelola Arus Keuangan: pencatat keuangan pribadi berbasis pos anggaran dan siklus gajian."
 publish_to: 'none'
-version: 2.1.0+3
+version: 2.1.1+4
 
 environment:
   sdk: ^3.9.0

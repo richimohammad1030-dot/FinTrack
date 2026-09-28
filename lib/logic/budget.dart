@@ -23,7 +23,8 @@ class PeriodSummary {
   /// Total per sumber pemasukan.
   final Map<int, int> incomeByCategory;
 
-  /// Pengeluaran riil per hari (kunci = tanggal tanpa jam).
+  /// Pengeluaran HARIAN per hari (hanya pos yang masuk jatah harian;
+  /// kos, tagihan, dll. tidak termasuk). Kunci = tanggal tanpa jam.
   final Map<DateTime, int> daily;
 
   /// Uang masuk / keluar karena hutang-piutang (bukan pemasukan/pengeluaran).
@@ -52,8 +53,9 @@ class PeriodSummary {
   static PeriodSummary compute(
     Iterable<Txn> txns,
     PayPeriod period,
-    Set<int> savingCategoryIds,
-  ) {
+    Set<int> savingCategoryIds, {
+    Set<int> nonDailyIds = const {},
+  }) {
     var income = 0, expense = 0, saving = 0, debtIn = 0, debtOut = 0;
     final byCat = <int, int>{};
     final incomeByCat = <int, int>{};
@@ -71,8 +73,10 @@ class PeriodSummary {
             saving += t.amount;
           } else {
             expense += t.amount;
-            final d = dateOnly(t.date);
-            daily[d] = (daily[d] ?? 0) + t.amount;
+            if (!nonDailyIds.contains(cat)) {
+              final d = dateOnly(t.date);
+              daily[d] = (daily[d] ?? 0) + t.amount;
+            }
           }
         case TxnType.transfer:
           break;
@@ -173,20 +177,23 @@ class DailyBudget {
   }
 }
 
-/// Anggaran pengeluaran periode: jumlah batas semua pos non-tabungan.
-/// Kalau belum ada batas sama sekali, pakai (pemasukan − target tabungan).
+/// Anggaran HARIAN periode: jumlah batas pos yang masuk jatah harian
+/// (makan, transport, jajan…). Pos bulanan seperti kos & tagihan tidak ikut.
+/// Kalau pos harian belum diberi batas, pakai: pemasukan − tabungan − pos
+/// bulanan (batasnya, atau yang sudah terpakai kalau lebih besar).
 int periodBudgetFor(PeriodSummary summary, List<Pos> categories) {
-  var limits = 0, savingTarget = 0;
+  var dailyLimits = 0, reserved = 0;
   for (final c in categories) {
     if (!c.isExpense || c.archived) continue;
-    if (c.isSaving) {
-      savingTarget += c.monthlyLimit;
+    if (c.isDaily) {
+      dailyLimits += c.monthlyLimit;
     } else {
-      limits += c.monthlyLimit;
+      final spent = c.id == null ? 0 : summary.spentIn(c.id!);
+      reserved += c.monthlyLimit > spent ? c.monthlyLimit : spent;
     }
   }
-  if (limits > 0) return limits;
-  final fallback = summary.income - savingTarget;
+  if (dailyLimits > 0) return dailyLimits;
+  final fallback = summary.income - reserved;
   return fallback > 0 ? fallback : 0;
 }
 

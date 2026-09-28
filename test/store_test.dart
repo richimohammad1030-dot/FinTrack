@@ -157,4 +157,18 @@ void main() {
     expect(store.wallets, isEmpty);
     expect(store.expenseCategories, isNotEmpty);
   });
+
+  test('bayar kos tidak memicu peringatan batas harian', () async {
+    final (store, _, notifier) = await makeStore(now: now);
+    final w = await store.saveWallet(const Wallet(name: 'BCA'));
+    final kos = store.expenseCategories.firstWhere((c) => c.name == 'Tagihan & Kos');
+    final makan = store.expenseCategories.firstWhere((c) => c.name == 'Makan & Minum');
+    expect(kos.countsDaily, isFalse);
+    await store.saveLimits({kos.id!: 1500000, makan.id!: 1500000});
+    final alerts = await store.addTxn(
+        Txn(type: TxnType.expense, amount: 1500000, categoryId: kos.id, walletId: w, date: now));
+    expect(alerts.where((a) => a.scope == AlertScope.daily), isEmpty);
+    expect(store.dailyBudget.spentToday, 0);
+    expect(notifier.shown.where((a) => a.scope == AlertScope.daily), isEmpty);
+  });
 }

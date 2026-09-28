@@ -231,8 +231,8 @@ class _TodayCard extends StatelessWidget {
             if (noBudget) ...[
               const SizedBox(height: 12),
               Text(
-                'Batas harian dihitung dari total pos anggaran dibagi sisa hari sampai gajian. '
-                'Buka tab Pos → Bagi Gaji.',
+                'Jatah harian dihitung dari batas pos harian (makan, transport, jajan) dibagi sisa hari '
+                'sampai gajian. Buka tab Pos → Bagi Gaji.',
                 style: TextStyle(color: muted, fontSize: 12.5),
               ),
             ] else if (usedUp) ...[

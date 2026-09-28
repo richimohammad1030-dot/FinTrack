@@ -170,4 +170,25 @@ void main() {
       expect(firstDueOnOrAfter(DateTime(2026, 9, 28), 28), DateTime(2026, 9, 28));
     });
   });
+
+  test('pos bulanan (kos) tidak mengurangi jatah harian', () {
+    final period = PayPeriod.containing(DateTime(2026, 9, 28), 28); // 28 Sep – 27 Okt, 30 hari
+    final cats = [
+      const Pos(id: 1, name: 'Makan', kind: PosKind.expense, monthlyLimit: 1500000),
+      const Pos(id: 2, name: 'Transport', kind: PosKind.expense, monthlyLimit: 600000),
+      const Pos(id: 4, name: 'Tagihan & Kos', kind: PosKind.expense, monthlyLimit: 1400000, countsDaily: false),
+    ];
+    final today = DateTime(2026, 9, 28, 18);
+    final s = PeriodSummary.compute([
+      exp(1400000, today, cat: 4), // bayar kos
+      exp(300000, today, cat: 4), // token listrik
+      exp(40000, today, cat: 1), // makan
+    ], period, const {}, nonDailyIds: {4});
+    final d = DailyBudget.compute(summary: s, categories: cats, today: today);
+    expect(s.expense, 1740000); // tetap tercatat sebagai pengeluaran
+    expect(d.periodBudget, 2100000); // hanya pos harian
+    expect(d.allowance, 70000); // 2.100.000 ÷ 30
+    expect(d.spentToday, 40000); // kos & listrik tidak ikut
+    expect(d.level, BudgetLevel.ok);
+  });
 }
