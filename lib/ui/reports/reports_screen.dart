@@ -97,6 +97,8 @@ class _SummaryCard extends StatelessWidget {
             row('Pemasukan', s.income, p.income),
             row('Pengeluaran', s.expense, p.expense),
             row('Ditabung', s.saving, p.saving),
+            if (s.debtIn > 0) row('Uang pinjaman / piutang kembali', s.debtIn, const Color(0xFF2A78D6)),
+            if (s.debtOut > 0) row('Bayar hutang / meminjamkan', s.debtOut, p.warning),
             if (s.income > 0) ...[
               const Divider(height: 24),
               Row(

@@ -1,7 +1,7 @@
 // Data contoh untuk widget test & screenshot.
 
-import 'package:fintrack/data/models.dart';
-import 'package:fintrack/state/finance_store.dart';
+import 'package:kait/data/models.dart';
+import 'package:kait/state/finance_store.dart';
 
 Future<void> seedDemo(FinanceStore store) async {
   final s = store.settings;
@@ -82,5 +82,19 @@ Future<void> seedDemo(FinanceStore store) async {
     nextDate: DateTime(2026, 9, 28),
     autoRecord: false,
   ));
+  // Hutang & piutang
+  final kredivo = await store.createDebt(
+    Debt(kind: DebtKind.payable, name: 'Kredivo', startDate: DateTime(2026, 6, 10), dueDate: DateTime(2026, 10, 2),
+        note: 'Cicilan HP'),
+    amount: 2400000,
+  );
+  await store.db.insertTxn(Txn(type: TxnType.debtOut, amount: 400000, walletId: bca, debtId: kredivo,
+      date: DateTime(2026, 7, 10, 9)));
+  await store.db.insertTxn(Txn(type: TxnType.debtOut, amount: 400000, walletId: bca, debtId: kredivo,
+      date: DateTime(2026, 8, 10, 9)));
+  await store.db.insertTxn(Txn(type: TxnType.debtOut, amount: 400000, walletId: bca, debtId: kredivo,
+      date: DateTime(2026, 9, 10, 9)));
+  await store.createDebt(Debt(kind: DebtKind.receivable, name: 'Andi', startDate: DateTime(2026, 9, 26),
+      dueDate: DateTime(2026, 10, 25)), amount: 300000, walletId: cash);
   await store.load();
 }

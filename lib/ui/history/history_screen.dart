@@ -47,7 +47,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final list = store.transactions.where((t) {
       if (!period.contains(t.date)) return false;
-      if (_type != null && t.type != _type) return false;
+      if (_type != null) {
+        // Chip "Hutang" mencakup uang masuk & keluar karena hutang.
+        final match = _type == TxnType.debtOut ? t.isDebt : t.type == _type;
+        if (!match) return false;
+      }
       if (_categoryId != null && t.categoryId != _categoryId) return false;
       if (_walletId != null && t.walletId != _walletId && t.toWalletId != _walletId) return false;
       if (q.isNotEmpty) {
@@ -122,6 +126,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ('Keluar', TxnType.expense),
                   ('Masuk', TxnType.income),
                   ('Transfer', TxnType.transfer),
+                  ('Hutang', TxnType.debtOut),
                 ])
                   Padding(
                     padding: const EdgeInsets.only(right: 8),

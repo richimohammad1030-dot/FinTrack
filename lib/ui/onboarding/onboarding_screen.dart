@@ -12,6 +12,7 @@ import '../../state/finance_store.dart';
 import '../../state/settings.dart';
 import '../budget/allocation_editor.dart';
 import '../lock/pin_pad.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _page = PageController();
   int _step = 0;
-  static const _steps = 4;
+  static const _steps = 5;
 
   late int _payday;
   int _income = 0;
@@ -150,10 +151,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 controller: _page,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
+                  const _WelcomePage(),
                   _StepPage(
                     emoji: '📅',
                     title: 'Kapan kamu gajian?',
-                    body: 'FinTrack menghitung anggaran per periode gajian, bukan per tanggal 1. '
+                    body: 'KAIT menghitung anggaran per periode gajian, bukan per tanggal 1. '
                         'Jadi "sisa uang" dan "jatah harian" selalu sampai gajian berikutnya.',
                     child: _PaydayGrid(value: _payday, onChanged: (d) => setState(() => _payday = d)),
                   ),
@@ -213,7 +215,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Expanded(
                           child: FilledButton(
                             onPressed: () => _go(_step + 1),
-                            child: Text(_step == 1 && _limits.values.every((v) => v == 0) ? 'Lewati dulu' : 'Lanjut'),
+                            child: Text(_step == 0
+                                ? 'Mulai'
+                                : _step == 2 && _limits.values.every((v) => v == 0) ? 'Lewati dulu' : 'Lanjut'),
                           ),
                         ),
                       ],
@@ -233,6 +237,53 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WelcomePage extends StatelessWidget {
+  const _WelcomePage();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget meaning(IconData k, String rest) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: context.colors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(k, size: 18, color: context.colors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(rest, style: context.text.bodyLarge)),
+          ]),
+        );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+      children: [
+        const Center(child: KaitLogo(size: 112)),
+        const SizedBox(height: 20),
+        Center(
+          child: Text('KAIT',
+              style: context.text.displaySmall?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w800)),
+        ),
+        const SizedBox(height: 28),
+        meaning(Icons.swap_vert_rounded, 'Kelola Arus Keuangan'),
+        meaning(Icons.account_balance_rounded, 'Kelola Aset & Income'),
+        meaning(Icons.payments_rounded, 'Kelola Duit'),
+        const SizedBox(height: 16),
+        Text(
+          '"Kait" artinya mengait dan menarik — harapan agar rezeki terus datang, '
+          'terkumpul, dan tidak lepas begitu saja.',
+          style: context.text.bodyMedium?.copyWith(color: context.palette.muted, height: 1.5),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

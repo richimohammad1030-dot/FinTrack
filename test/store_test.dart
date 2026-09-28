@@ -1,5 +1,5 @@
-import 'package:fintrack/data/models.dart';
-import 'package:fintrack/logic/budget.dart';
+import 'package:kait/data/models.dart';
+import 'package:kait/logic/budget.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 

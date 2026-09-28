@@ -1,7 +1,7 @@
-import 'package:fintrack/data/database.dart';
-import 'package:fintrack/services/notifications.dart';
-import 'package:fintrack/state/finance_store.dart';
-import 'package:fintrack/state/settings.dart';
+import 'package:kait/data/database.dart';
+import 'package:kait/services/notifications.dart';
+import 'package:kait/state/finance_store.dart';
+import 'package:kait/state/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

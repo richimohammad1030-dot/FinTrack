@@ -1,11 +1,16 @@
-# FinTrack — Tahu ke mana gajimu pergi
+<p align="center"><img src="assets/brand/kait_icon.png" width="96" alt="Logo KAIT"></p>
 
-FinTrack adalah aplikasi Android (Flutter) untuk mencatat pemasukan & pengeluaran pribadi dengan
-pendekatan **pos anggaran per periode gajian**. Tujuannya sederhana: gaji tidak lagi "habis entah ke mana".
+# KAIT — Kelola Arus Keuangan
 
-| Beranda | Pos anggaran | Laporan | Catat |
+**KAIT** = Kelola Arus Keuangan · Kelola Aset & Income · Kelola Duit. *Kait* juga berarti mengait/menarik:
+harapan agar rezeki terus datang dan terkumpul.
+
+KAIT adalah aplikasi Android (Flutter) untuk mencatat pemasukan & pengeluaran pribadi dengan pendekatan
+**pos anggaran per periode gajian**, supaya gaji tidak lagi "habis entah ke mana".
+
+| Beranda | Catat + scan struk | Hutang | Laporan |
 |---|---|---|---|
-| ![Beranda](docs/screenshots/01-beranda.png) | ![Pos](docs/screenshots/03-pos.png) | ![Laporan](docs/screenshots/04-laporan.png) | ![Catat](docs/screenshots/07-catat.png) |
+| ![Beranda](docs/screenshots/01-beranda.png) | ![Catat](docs/screenshots/07-catat.png) | ![Hutang](docs/screenshots/13-hutang-detail.png) | ![Laporan](docs/screenshots/04-laporan.png) |
 
 ## Fitur
 
@@ -20,6 +25,11 @@ pendekatan **pos anggaran per periode gajian**. Tujuannya sederhana: gaji tidak 
 - **Multi dompet** — Tunai, rekening bank, e-wallet, dengan saldo masing-masing dan transfer antar dompet.
 - **Transaksi rutin** — kos, internet, cicilan tercatat otomatis tiap bulan, atau diingatkan untuk
   tagihan yang nominalnya berubah (listrik, air).
+- **Hutang & piutang** — catat pinjaman (uang masuk dompet atau hutang lama), pelunasan sebagian/penuh,
+  sisa & progres, jatuh tempo dengan pengingat H-3 dan hari-H, cicilan bulanan otomatis yang berhenti
+  sendiri saat lunas. Pembayaran hutang tidak memakan jatah harian.
+- **Scan struk** — foto struk atau pilih dari galeri; total, tanggal, nama toko, dan tebakan pos terisi
+  otomatis. OCR memakai Google ML Kit **di dalam HP** (offline), foto langsung dihapus setelah dibaca.
 - **Target tabungan** — progres, tenggat, dan saran setoran per bulan.
 - **Laporan** — donat per pos, grafik pengeluaran harian vs jatah, perbandingan dengan periode lalu,
   rasio menabung, pengeluaran terbesar.
@@ -27,6 +37,7 @@ pendekatan **pos anggaran per periode gajian**. Tujuannya sederhana: gaji tidak 
   ditinggal, mode sembunyikan nominal. Semua data hanya di HP (SQLite), tanpa server.
 - **Backup / restore** ke file JSON (bisa disimpan ke Google Drive).
 - Tema terang & gelap, bahasa Indonesia, font Plus Jakarta Sans.
+- Tanpa izin internet sama sekali.
 
 ## Struktur kode
 
@@ -35,11 +46,12 @@ lib/
   main.dart, app.dart        # inisialisasi, tema, kunci PIN, onboarding
   core/                      # tema, format rupiah/tanggal, katalog ikon & warna
   data/                      # model, database SQLite, pos bawaan
-  logic/                     # periode gajian, anggaran & peringatan, transaksi rutin (murni, teruji)
+  logic/                     # periode gajian, anggaran & peringatan, transaksi rutin, parser struk (murni, teruji)
   state/                     # FinanceStore (state utama), Settings
-  services/                  # keamanan (PIN/biometrik), notifikasi
-  ui/                        # layar: home, history, budget, reports, more, onboarding, lock, txn
+  services/                  # keamanan (PIN/biometrik), notifikasi, pemindai struk (ML Kit)
+  ui/                        # layar: home, history, budget, reports, debt, more, onboarding, lock, txn
 test/                        # unit test logika, test database/store, widget test
+assets/brand/                # logo & ikon KAIT
 docs/screenshots/            # tangkapan layar (dibuat dari test/screenshots_test.dart)
 ```
 
@@ -49,7 +61,8 @@ docs/screenshots/            # tangkapan layar (dibuat dari test/screenshots_tes
 flutter pub get
 flutter test                 # semua pengujian
 flutter run                  # jalankan di HP/emulator
-flutter build apk --release  # APK di build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi  # APK per arsitektur di build/app/outputs/flutter-apk/
+dart run flutter_launcher_icons              # buat ulang ikon dari assets/brand/
 ```
 
 ### Kunci rilis (penting)
@@ -66,6 +79,9 @@ keyPassword=...
 keyAlias=fintrack
 storeFile=fintrack-release.jks
 ```
+
+(Nama kunci & ID paket `com.richi.fintrack` sengaja tidak diganti supaya update bisa dipasang di atas
+versi sebelumnya tanpa kehilangan data.)
 
 Tanpa file ini, build rilis memakai kunci debug.
 

@@ -10,6 +10,7 @@ import '../../data/models.dart';
 import '../../logic/period.dart';
 import '../../logic/recurring.dart';
 import '../../state/finance_store.dart';
+import '../debt/debt_screen.dart';
 import '../widgets/common.dart';
 
 class RecurringScreen extends StatelessWidget {
@@ -20,7 +21,7 @@ class RecurringScreen extends StatelessWidget {
     final store = context.watch<FinanceStore>();
     final items = store.recurrings;
     final monthlyOut = items
-        .where((r) => r.active && r.type == TxnType.expense)
+        .where((r) => r.active && (r.type == TxnType.expense || r.type == TxnType.debtOut))
         .fold(0, (s, r) => s + r.amount);
     return Scaffold(
       appBar: AppBar(title: const Text('Transaksi Rutin')),
@@ -34,7 +35,7 @@ class RecurringScreen extends StatelessWidget {
               icon: Icons.event_repeat_rounded,
               title: 'Belum ada transaksi rutin',
               message: 'Tambahkan tagihan bulanan seperti kos, internet, BPJS, atau cicilan. '
-                  'FinTrack akan mencatatnya otomatis (atau mengingatkanmu) setiap jatuh tempo.',
+                  'KAIT akan mencatatnya otomatis (atau mengingatkanmu) setiap jatuh tempo.',
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
@@ -76,15 +77,20 @@ class _RecurringCard extends StatelessWidget {
     final store = context.read<FinanceStore>();
     final cat = store.category(r.categoryId);
     final wallet = store.wallet(r.walletId);
-    final isIncome = r.type == TxnType.income;
+    final debt = store.debt(r.debtId);
+    final isIncome = r.type.isInflow;
     return Opacity(
       opacity: r.active ? 1 : 0.5,
       child: AppCard(
-        onTap: () => showRecurringEditor(context, edit: r),
+        onTap: () => debt != null
+            ? showInstallmentEditor(context, debt, edit: r)
+            : showRecurringEditor(context, edit: r),
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            IconBadge(icon: cat?.icon ?? 'receipt', color: cat?.color ?? 0xFF64748B),
+            IconBadge(
+                icon: debt != null ? 'loan' : (cat?.icon ?? 'receipt'),
+                color: debt != null ? debtColor(context, debt.kind).toARGB32() : (cat?.color ?? 0xFF64748B)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

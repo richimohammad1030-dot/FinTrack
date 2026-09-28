@@ -37,6 +37,7 @@ class FinanceStore extends ChangeNotifier {
   List<Pos> _categories = [];
   List<Goal> _goals = [];
   List<Recurring> _recurrings = [];
+  List<Debt> _debts = [];
   List<Txn> _txns = [];
   bool _loaded = false;
 
@@ -51,6 +52,8 @@ class FinanceStore extends ChangeNotifier {
   List<Goal> get goals => _goals;
   List<Goal> get activeGoals => _goals.where((g) => !g.archived).toList();
   List<Recurring> get recurrings => _recurrings;
+  List<Debt> get debts => _debts;
+  Debt? debt(int? id) => id == null ? null : _debts.where((d) => d.id == id).firstOrNull;
 
   /// Semua transaksi, terbaru di atas.
   List<Txn> get transactions => _txns;
@@ -73,6 +76,7 @@ class FinanceStore extends ChangeNotifier {
     await processRecurring();
     _loaded = true;
     notifyListeners();
+    syncDebtReminders();
   }
 
   Future<void> _reloadAll() async {
@@ -80,6 +84,7 @@ class FinanceStore extends ChangeNotifier {
     _categories = await db.categories();
     _goals = await db.goals();
     _recurrings = await db.recurrings();
+    _debts = await db.debts();
     _txns = await db.transactions();
     _reindex();
   }
@@ -134,7 +139,7 @@ class FinanceStore extends ChangeNotifier {
     var bal = w?.initialBalance ?? 0;
     for (final t in _txns) {
       if (t.walletId == walletId) {
-        bal += t.isIncome ? t.amount : -t.amount;
+        bal += t.type.isInflow ? t.amount : -t.amount;
       }
       if (t.isTransfer && t.toWalletId == walletId) bal += t.amount;
     }
@@ -186,6 +191,7 @@ class FinanceStore extends ChangeNotifier {
     _txns.remove(t);
     _changed();
     await db.deleteTxn(id);
+    if (t.debtId != null) await _afterDebtChange(t.debtId!);
     return t;
   }
 
@@ -194,6 +200,7 @@ class FinanceStore extends ChangeNotifier {
     await db.insertTxn(t);
     _insertSorted(t);
     _changed();
+    if (t.debtId != null) await _afterDebtChange(t.debtId!);
   }
 
   void _insertSorted(Txn t) {
@@ -358,28 +365,50 @@ class FinanceStore extends ChangeNotifier {
 
   Future<int> _processRecurring() async {
     var created = 0;
+    var touchedDebt = false;
     // Selalu baca ulang dari database supaya tanggal jatuh tempo terbaru.
     for (final r in await db.recurrings()) {
       if (!r.autoRecord) continue;
       final due = dueDates(r, now);
       if (due.isEmpty) continue;
-      final txns = [
-        for (final d in due)
-          Txn(
-            type: r.type,
-            amount: r.amount,
-            categoryId: r.categoryId,
-            walletId: r.walletId,
-            recurringId: r.id,
-            date: DateTime(d.year, d.month, d.day, 8),
-            note: r.title,
-          ),
-      ];
+      final txns = <Txn>[];
+      var stillActive = true;
+      // Cicilan hutang: jangan melebihi sisa, dan berhenti otomatis saat lunas.
+      var left = -1;
+      if (r.debtId != null) {
+        final d = debt(r.debtId) ?? (await db.debts()).where((x) => x.id == r.debtId).firstOrNull;
+        final st = d == null ? null : debtStatus(d);
+        left = st == null || st.settled ? 0 : (st.remaining < 0 ? 0 : st.remaining);
+        touchedDebt = true;
+      }
+      for (final d in due) {
+        var amount = r.amount;
+        if (left >= 0) {
+          if (left <= 0) {
+            stillActive = false;
+            break;
+          }
+          if (amount > left) amount = left;
+          left -= amount;
+        }
+        txns.add(Txn(
+          type: r.type,
+          amount: amount,
+          categoryId: r.categoryId,
+          walletId: r.walletId,
+          recurringId: r.id,
+          debtId: r.debtId,
+          date: DateTime(d.year, d.month, d.day, 8),
+          note: r.title,
+        ));
+      }
+      if (left == 0) stillActive = false;
+      final next = txns.isEmpty ? r.nextDate : nextDue(due[txns.length - 1], r.dayOfMonth);
       // Transaksi + tanggal berikutnya disimpan dalam satu transaksi database.
-      await db.postRecurring(r.copyWith(nextDate: nextDue(due.last, r.dayOfMonth)), txns);
+      await db.postRecurring(r.copyWith(nextDate: next, active: stillActive), txns);
       created += txns.length;
     }
-    if (created > 0) {
+    if (created > 0 || touchedDebt) {
       _recurrings = await db.recurrings();
       _txns = await db.transactions();
       _changed();
@@ -389,16 +418,28 @@ class FinanceStore extends ChangeNotifier {
 
   /// Konfirmasi tagihan rutin (mode "ingatkan saja") dengan nominal aktual.
   Future<List<BudgetAlert>> confirmRecurring(Recurring r, int amount) async {
+    final d = debt(r.debtId);
+    if (d != null) {
+      final left = debtStatus(d).remaining;
+      if (left <= 0) {
+        await skipRecurring(r);
+        await _afterDebtChange(d.id!);
+        return const [];
+      }
+      if (amount > left) amount = left;
+    }
     final alerts = await addTxn(Txn(
       type: r.type,
       amount: amount,
       categoryId: r.categoryId,
       walletId: r.walletId,
       recurringId: r.id,
+      debtId: r.debtId,
       date: DateTime(now.year, now.month, now.day, now.hour, now.minute),
       note: r.title,
     ));
     await skipRecurring(r);
+    if (r.debtId != null) await _afterDebtChange(r.debtId!);
     return alerts;
   }
 
@@ -409,15 +450,199 @@ class FinanceStore extends ChangeNotifier {
     _changed();
   }
 
+  // ── Hutang & piutang ────────────────────────────────────────────────────
+
+  DebtStatus debtStatus(Debt d) {
+    var total = d.principal, paid = 0;
+    DateTime? last;
+    for (final t in _txns) {
+      if (t.debtId != d.id) continue;
+      if (t.type == d.increaseType) {
+        total += t.amount;
+      } else if (t.type == d.decreaseType) {
+        paid += t.amount;
+        if (last == null || t.date.isAfter(last)) last = t.date;
+      }
+    }
+    return DebtStatus(d, total, paid, last);
+  }
+
+  List<DebtStatus> get debtStatuses {
+    final list = [for (final d in _debts) debtStatus(d)];
+    int rank(DebtStatus s) => s.settled ? 1 : 0;
+    list.sort((a, b) {
+      final r = rank(a).compareTo(rank(b));
+      if (r != 0) return r;
+      final da = a.debt.dueDate, dbb = b.debt.dueDate;
+      if (da != null && dbb != null) return da.compareTo(dbb);
+      if (da != null) return -1;
+      if (dbb != null) return 1;
+      return b.remaining.compareTo(a.remaining);
+    });
+    return list;
+  }
+
+  List<DebtStatus> get activeDebts => debtStatuses.where((s) => !s.settled).toList();
+
+  /// Total sisa hutang saya (aktif).
+  int get totalPayable =>
+      activeDebts.where((s) => s.debt.isPayable).fold(0, (a, s) => a + s.remaining);
+
+  /// Total sisa piutang (orang berhutang ke saya).
+  int get totalReceivable =>
+      activeDebts.where((s) => !s.debt.isPayable).fold(0, (a, s) => a + s.remaining);
+
+  /// Hutang/piutang yang jatuh tempo dalam [days] hari atau sudah lewat.
+  List<DebtStatus> dueSoonDebts({int days = 7}) {
+    final limit = dateOnly(now).add(Duration(days: days));
+    return activeDebts.where((s) => s.debt.dueDate != null && !dateOnly(s.debt.dueDate!).isAfter(limit)).toList();
+  }
+
+  List<Txn> debtTxns(int debtId) => _txns.where((t) => t.debtId == debtId).toList();
+
+  List<Recurring> debtRecurrings(int debtId) => _recurrings.where((r) => r.debtId == debtId).toList();
+
+  /// Catat hutang/piutang baru. Kalau [walletId] diisi, uangnya ikut
+  /// masuk/keluar dompet (mis. pinjam uang tunai). Kalau tidak, jumlahnya
+  /// dicatat sebagai hutang lama tanpa mengubah saldo.
+  Future<int> createDebt(Debt d, {required int amount, int? walletId}) async {
+    final id = await db.insertDebt(Debt(
+      kind: d.kind,
+      name: d.name,
+      principal: walletId == null ? amount : 0,
+      startDate: d.startDate,
+      dueDate: d.dueDate,
+      note: d.note,
+    ));
+    if (walletId != null && amount > 0) {
+      await db.insertTxn(Txn(
+        type: d.increaseType,
+        amount: amount,
+        walletId: walletId,
+        debtId: id,
+        date: d.startDate,
+        note: d.note,
+      ));
+    }
+    _debts = await db.debts();
+    _txns = await db.transactions();
+    _changed();
+    syncDebtReminders();
+    return id;
+  }
+
+  Future<void> updateDebt(Debt d) async {
+    await db.updateDebt(d);
+    _debts = await db.debts();
+    _changed();
+    await _afterDebtChange(d.id!);
+  }
+
+  /// Hapus hutang beserta semua pembayaran & cicilan rutinnya.
+  Future<void> deleteDebt(int id) async {
+    await notifier.cancel(_debtReminderId(id, 0));
+    await notifier.cancel(_debtReminderId(id, 1));
+    await db.deleteDebt(id);
+    _debts = await db.debts();
+    _txns = await db.transactions();
+    _recurrings = await db.recurrings();
+    _changed();
+  }
+
+  /// Catat pembayaran (mengurangi) atau tambahan pinjaman (menambah).
+  Future<void> recordDebtTxn(
+    Debt d, {
+    required int amount,
+    required int walletId,
+    required DateTime date,
+    String note = '',
+    bool increase = false,
+    Txn? edit,
+  }) async {
+    final t = Txn(
+      id: edit?.id,
+      type: increase ? d.increaseType : d.decreaseType,
+      amount: amount,
+      walletId: walletId,
+      debtId: d.id,
+      recurringId: edit?.recurringId,
+      date: date,
+      note: note,
+      createdAt: edit?.createdAt,
+    );
+    if (edit == null) {
+      await addTxn(t);
+    } else {
+      await updateTxn(t);
+    }
+    await _afterDebtChange(d.id!);
+  }
+
+  Future<void> setDebtClosed(Debt d, bool closed) => updateDebt(d.copyWith(closed: closed));
+
+  /// Buat cicilan bulanan otomatis/diingatkan untuk hutang/piutang.
+  Future<void> saveDebtInstallment(Debt d, Recurring r) =>
+      saveRecurring(r.copyWith(type: d.decreaseType, categoryId: null));
+
+  /// Setelah lunas: matikan cicilan rutin & pengingat.
+  Future<void> _afterDebtChange(int debtId) async {
+    final d = debt(debtId);
+    if (d == null) return;
+    if (debtStatus(d).settled) {
+      for (final r in debtRecurrings(debtId).where((r) => r.active)) {
+        await db.updateRecurring(r.copyWith(active: false));
+      }
+      _recurrings = await db.recurrings();
+      _changed();
+    }
+    syncDebtReminders();
+  }
+
+  static int _debtReminderId(int debtId, int which) => 5000 + debtId * 2 + which;
+
+  /// Jadwalkan pengingat H-3 dan hari-H (jam 09.00) untuk semua hutang aktif.
+  /// ID yang pernah dijadwalkan disimpan, supaya pengingat hutang yang sudah
+  /// dihapus/di-reset juga ikut dibatalkan.
+  Future<void> syncDebtReminders() async {
+    for (final id in settings.debtReminderIds) {
+      await notifier.cancel(id);
+    }
+    final scheduled = <int>[];
+    if (settings.alertsEnabled) {
+      for (final d in _debts) {
+        final st = debtStatus(d);
+        final due = d.dueDate;
+        if (st.settled || due == null) continue;
+        final who = d.isPayable ? 'Hutang ke ${d.name}' : 'Piutang dari ${d.name}';
+        final dueDay = DateTime(due.year, due.month, due.day, 9);
+        final before = DateTime(due.year, due.month, due.day - 3, 9);
+        if (before.isAfter(now)) {
+          final id = _debtReminderId(d.id!, 0);
+          await notifier.scheduleOnce(id, before, '$who jatuh tempo 3 hari lagi',
+              'Sisa ${rupiah(st.remaining)} · jatuh tempo ${fmtDate(due)}');
+          scheduled.add(id);
+        }
+        if (dueDay.isAfter(now)) {
+          final id = _debtReminderId(d.id!, 1);
+          await notifier.scheduleOnce(id, dueDay, '$who jatuh tempo hari ini',
+              'Sisa ${rupiah(st.remaining)}. Jangan lupa ${d.isPayable ? 'dibayar' : 'ditagih'} ya.');
+          scheduled.add(id);
+        }
+      }
+    }
+    settings.debtReminderIds = scheduled;
+  }
+
   // ── Backup ──────────────────────────────────────────────────────────────
 
-  static const backupFormat = 'fintrack-backup';
+  static const backupFormat = 'kait-backup';
+  static const _legacyFormat = 'fintrack-backup';
 
   Future<String> exportJson() async {
     final data = await db.dumpAll();
     return const JsonEncoder.withIndent(' ').convert({
       'format': backupFormat,
-      'version': 1,
+      'version': 2,
       'exported_at': now.toIso8601String(),
       'settings': {
         'payday': settings.payday,
@@ -434,16 +659,20 @@ class FinanceStore extends ChangeNotifier {
     try {
       decoded = jsonDecode(json);
     } catch (_) {
-      throw const FormatException('File bukan backup FinTrack yang valid.');
+      throw const FormatException('File bukan backup KAIT yang valid.');
     }
-    if (decoded is! Map || decoded['format'] != backupFormat || decoded['data'] is! Map) {
-      throw const FormatException('File bukan backup FinTrack yang valid.');
+    if (decoded is! Map ||
+        (decoded['format'] != backupFormat && decoded['format'] != _legacyFormat) ||
+        decoded['data'] is! Map) {
+      throw const FormatException('File bukan backup KAIT yang valid.');
     }
-    if (decoded['version'] != 1) {
+    final version = decoded['version'];
+    if (version != 1 && version != 2) {
       throw const FormatException('Versi backup tidak dikenali. Perbarui aplikasi terlebih dahulu.');
     }
     final raw = decoded['data'] as Map;
-    for (final t in AppDatabase.tables) {
+    // Backup versi 1 belum punya tabel hutang.
+    for (final t in AppDatabase.tables.where((t) => version == 2 || t != 'debts')) {
       if (raw[t] is! List) {
         throw FormatException('File backup tidak lengkap (bagian "$t" tidak ada).');
       }

@@ -15,6 +15,10 @@ abstract class Notifier {
   Future<void> showAlert(BudgetAlert alert);
   Future<void> scheduleDailyReminder(TimeOfDay time);
   Future<void> cancelDailyReminder();
+
+  /// Notifikasi sekali pada waktu tertentu (pengingat jatuh tempo hutang).
+  Future<void> scheduleOnce(int id, DateTime at, String title, String body);
+  Future<void> cancel(int id);
 }
 
 /// Dipakai di pengujian / platform tanpa notifikasi.
@@ -30,6 +34,11 @@ class NoopNotifier implements Notifier {
   Future<void> scheduleDailyReminder(TimeOfDay time) async {}
   @override
   Future<void> cancelDailyReminder() async {}
+  final scheduled = <int, (DateTime, String)>{};
+  @override
+  Future<void> scheduleOnce(int id, DateTime at, String title, String body) async => scheduled[id] = (at, title);
+  @override
+  Future<void> cancel(int id) async => scheduled.remove(id);
 }
 
 class LocalNotifier implements Notifier {
@@ -123,6 +132,40 @@ class LocalNotifier implements Notifier {
     } catch (e) {
       debugPrint('Gagal menjadwalkan pengingat: $e');
     }
+  }
+
+  static const _debtChannel = AndroidNotificationDetails(
+    'debt_reminders',
+    'Jatuh tempo hutang',
+    channelDescription: 'Pengingat hutang/piutang yang akan jatuh tempo',
+    importance: Importance.high,
+    priority: Priority.high,
+    icon: _icon,
+  );
+
+  @override
+  Future<void> scheduleOnce(int id, DateTime at, String title, String body) async {
+    if (!_ready) return;
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        scheduledDate: tz.TZDateTime.from(at, tz.local),
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(android: _debtChannel),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('Gagal menjadwalkan pengingat hutang: $e');
+    }
+  }
+
+  @override
+  Future<void> cancel(int id) async {
+    if (!_ready) return;
+    try {
+      await _plugin.cancel(id: id);
+    } catch (_) {}
   }
 
   @override

@@ -153,7 +153,7 @@ class SecurityService {
   Future<bool> authenticateBiometric() async {
     try {
       return await _la.authenticate(
-        localizedReason: 'Buka FinTrack',
+        localizedReason: 'Buka KAIT',
         biometricOnly: true,
         persistAcrossBackgrounding: true,
       );

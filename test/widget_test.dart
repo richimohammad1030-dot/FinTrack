@@ -1,5 +1,5 @@
-import 'package:fintrack/app.dart';
-import 'package:fintrack/services/security.dart';
+import 'package:kait/app.dart';
+import 'package:kait/services/security.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -17,7 +17,7 @@ Future<Widget> buildApp(WidgetTester tester, {bool demo = true}) async {
     if (demo) await seedDemo(store);
     final security = SecurityService(store: MemorySecretStore());
     await security.init();
-    app = FinTrackApp(settings: settings, store: store, security: security, notifier: notifier);
+    app = KaitApp(settings: settings, store: store, security: security, notifier: notifier);
   });
   return app;
 }
@@ -30,6 +30,9 @@ void main() {
 
   testWidgets('onboarding tampil untuk pengguna baru', (tester) async {
     await tester.pumpWidget(await buildApp(tester, demo: false));
+    await tester.pumpAndSettle();
+    expect(find.text('KAIT'), findsWidgets);
+    await tester.tap(find.text('Mulai'));
     await tester.pumpAndSettle();
     expect(find.text('Kapan kamu gajian?'), findsOneWidget);
     await tester.tap(find.text('Lanjut'));

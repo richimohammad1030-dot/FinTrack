@@ -1,7 +1,7 @@
-name: fintrack
-description: "FinTrack — pencatat keuangan pribadi berbasis pos anggaran dan siklus gajian."
+name: kait
+description: "KAIT — Kelola Arus Keuangan: pencatat keuangan pribadi berbasis pos anggaran dan siklus gajian."
 publish_to: 'none'
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: ^3.9.0
@@ -17,6 +17,8 @@ dependencies:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
   flutter_timezone: ^5.1.0
+  google_mlkit_text_recognition: ^0.17.1
+  image_picker: ^1.2.3
   intl: ^0.20.3
   local_auth: ^3.0.2
   path: ^1.9.1
@@ -36,6 +38,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/kait_icon.png
   fonts:
     - family: PlusJakartaSans
       fonts:
@@ -48,3 +52,14 @@ flutter:
           weight: 700
         - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
           weight: 800
+
+# Ikon aplikasi: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/brand/kait_launcher.png"
+  adaptive_icon_background: "#011B38"
+  adaptive_icon_foreground: "assets/brand/kait_adaptive_fg.png"
+  adaptive_icon_monochrome: "assets/brand/kait_adaptive_fg.png"
+  # Foreground sudah diberi ruang aman sendiri, jadi tanpa inset tambahan.
+  adaptive_icon_foreground_inset: 0

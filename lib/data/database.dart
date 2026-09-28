@@ -12,7 +12,7 @@ class AppDatabase {
   final Database db;
 
   static const fileName = 'fintrack.db';
-  static const version = 1;
+  static const version = 2;
 
   /// Buka database di penyimpanan aplikasi. [path] bisa diisi
   /// `inMemoryDatabasePath` untuk pengujian.
@@ -25,12 +25,67 @@ class AppDatabase {
       singleInstance: path != inMemoryDatabasePath,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
     if (path == null) {
       // Database aplikasi versi lama (Pro-Tracker) tidak dipakai lagi.
       await deleteDatabase(p.join(await getDatabasesPath(), 'pro_tracker.db'));
     }
     return AppDatabase._(db);
+  }
+
+  // ── Skema ──────────────────────────────────────────────────────────────
+  // v1: FinTrack 2.0 · v2: hutang/piutang (tabel debts, tipe debt_in/debt_out)
+
+  static const _debtsSql = '''
+      CREATE TABLE debts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL CHECK(kind IN ('payable','receivable')),
+        name TEXT NOT NULL,
+        principal INTEGER NOT NULL DEFAULT 0,
+        start_date TEXT NOT NULL,
+        due_date TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        closed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )''';
+
+  static const _recurringsSql = '''
+      CREATE TABLE recurrings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('expense','income','debtIn','debtOut')),
+        amount INTEGER NOT NULL,
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+        debt_id INTEGER REFERENCES debts(id) ON DELETE CASCADE,
+        day_of_month INTEGER NOT NULL,
+        next_date TEXT NOT NULL,
+        auto_record INTEGER NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        note TEXT NOT NULL DEFAULT ''
+      )''';
+
+  static const _transactionsSql = '''
+      CREATE TABLE transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL CHECK(type IN ('expense','income','transfer','debtIn','debtOut')),
+        amount INTEGER NOT NULL CHECK(amount > 0),
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+        to_wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
+        goal_id INTEGER REFERENCES goals(id) ON DELETE SET NULL,
+        recurring_id INTEGER REFERENCES recurrings(id) ON DELETE SET NULL,
+        debt_id INTEGER REFERENCES debts(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      )''';
+
+  static void _indexes(Batch b) {
+    b.execute('CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(date)');
+    b.execute('CREATE INDEX IF NOT EXISTS idx_txn_category ON transactions(category_id)');
+    b.execute('CREATE INDEX IF NOT EXISTS idx_txn_debt ON transactions(debt_id)');
   }
 
   static Future<void> _onCreate(Database db, int version) async {
@@ -69,40 +124,41 @@ class AppDatabase {
         archived INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )''');
-    batch.execute('''
-      CREATE TABLE recurrings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('expense','income')),
-        amount INTEGER NOT NULL,
-        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-        wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-        day_of_month INTEGER NOT NULL,
-        next_date TEXT NOT NULL,
-        auto_record INTEGER NOT NULL DEFAULT 1,
-        active INTEGER NOT NULL DEFAULT 1,
-        note TEXT NOT NULL DEFAULT ''
-      )''');
-    batch.execute('''
-      CREATE TABLE transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL CHECK(type IN ('expense','income','transfer')),
-        amount INTEGER NOT NULL CHECK(amount > 0),
-        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-        wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-        to_wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
-        goal_id INTEGER REFERENCES goals(id) ON DELETE SET NULL,
-        recurring_id INTEGER REFERENCES recurrings(id) ON DELETE SET NULL,
-        date TEXT NOT NULL,
-        note TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL
-      )''');
-    batch.execute('CREATE INDEX idx_txn_date ON transactions(date)');
-    batch.execute('CREATE INDEX idx_txn_category ON transactions(category_id)');
+    batch.execute(_debtsSql);
+    batch.execute(_recurringsSql);
+    batch.execute(_transactionsSql);
+    _indexes(batch);
     for (final c in defaultCategories()) {
       batch.insert('categories', c.toMap());
     }
     await batch.commit(noResult: true);
+  }
+
+  /// Migrasi tanpa kehilangan data. SQLite tidak bisa mengubah CHECK, jadi
+  /// tabel dibuat ulang lalu datanya disalin.
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(_debtsSql);
+      await db.execute('ALTER TABLE recurrings RENAME TO recurrings_v1');
+      await db.execute(_recurringsSql);
+      await db.execute('''
+        INSERT INTO recurrings (id, title, type, amount, category_id, wallet_id, day_of_month,
+          next_date, auto_record, active, note)
+        SELECT id, title, type, amount, category_id, wallet_id, day_of_month,
+          next_date, auto_record, active, note FROM recurrings_v1''');
+      await db.execute('ALTER TABLE transactions RENAME TO transactions_v1');
+      await db.execute(_transactionsSql);
+      await db.execute('''
+        INSERT INTO transactions (id, type, amount, category_id, wallet_id, to_wallet_id, goal_id,
+          recurring_id, date, note, created_at)
+        SELECT id, type, amount, category_id, wallet_id, to_wallet_id, goal_id,
+          recurring_id, date, note, created_at FROM transactions_v1''');
+      await db.execute('DROP TABLE transactions_v1');
+      await db.execute('DROP TABLE recurrings_v1');
+      final b = db.batch();
+      _indexes(b);
+      await b.commit(noResult: true);
+    }
   }
 
   Future<void> close() => db.close();
@@ -149,6 +205,12 @@ class AppDatabase {
       db.update('goals', g.toMap(), where: 'id = ?', whereArgs: [g.id]);
   Future<void> deleteGoal(int id) => db.delete('goals', where: 'id = ?', whereArgs: [id]);
 
+  // ── Debts ───────────────────────────────────────────────────────────────
+  Future<List<Debt>> debts() async => (await db.query('debts', orderBy: 'id')).map(Debt.fromMap).toList();
+  Future<int> insertDebt(Debt d) => db.insert('debts', d.toMap());
+  Future<void> updateDebt(Debt d) => db.update('debts', d.toMap(), where: 'id = ?', whereArgs: [d.id]);
+  Future<void> deleteDebt(int id) => db.delete('debts', where: 'id = ?', whereArgs: [id]);
+
   // ── Recurrings ──────────────────────────────────────────────────────────
   Future<List<Recurring>> recurrings() async =>
       (await db.query('recurrings', orderBy: 'next_date')).map(Recurring.fromMap).toList();
@@ -176,7 +238,7 @@ class AppDatabase {
   Future<void> deleteTxn(int id) => db.delete('transactions', where: 'id = ?', whereArgs: [id]);
 
   // ── Backup ──────────────────────────────────────────────────────────────
-  static const tables = ['wallets', 'categories', 'goals', 'recurrings', 'transactions'];
+  static const tables = ['wallets', 'categories', 'goals', 'debts', 'recurrings', 'transactions'];
 
   Future<Map<String, List<Map<String, Object?>>>> dumpAll() async => {
         for (final t in tables) t: await db.query(t),

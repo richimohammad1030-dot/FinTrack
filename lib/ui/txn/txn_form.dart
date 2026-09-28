@@ -10,6 +10,9 @@ import '../../data/models.dart';
 import '../../logic/budget.dart';
 import '../../state/finance_store.dart';
 import '../../state/settings.dart';
+import '../../logic/period.dart';
+import '../../logic/receipt_parser.dart';
+import '../../services/receipt_scanner.dart';
 import '../widgets/common.dart';
 
 /// Buka form transaksi. Setelah disimpan, peringatan anggaran (jika ada)
@@ -21,11 +24,13 @@ Future<void> openTxnForm(
   int? categoryId,
   int? goalId,
   int? amount,
+  bool scan = false,
 }) async {
   final alerts = await Navigator.of(context).push<List<BudgetAlert>>(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => TxnFormPage(
+        startScan: scan,
         edit: edit,
         initialType: type,
         initialCategoryId: categoryId,
@@ -102,8 +107,11 @@ class TxnFormPage extends StatefulWidget {
     this.initialCategoryId,
     this.initialGoalId,
     this.initialAmount,
+    this.startScan = false,
   });
 
+  /// Langsung buka pemindai struk saat form dibuka.
+  final bool startScan;
   final Txn? edit;
   final TxnType initialType;
   final int? initialCategoryId;
@@ -125,6 +133,11 @@ class _TxnFormPageState extends State<TxnFormPage> {
   int? _goalId;
   late DateTime _date;
   bool _saving = false;
+  bool _scanning = false;
+
+  /// Keterangan hasil scan terakhir (ditampilkan sebagai banner).
+  String? _scanInfo;
+  bool _scanConfident = true;
 
   FinanceStore get _store => context.read<FinanceStore>();
 
@@ -159,6 +172,88 @@ class _TxnFormPageState extends State<TxnFormPage> {
       _toWalletId = wallets.where((w) => w.id != _walletId).firstOrNull?.id;
       _date = store.now;
     }
+    if (widget.startScan && e == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scan());
+    }
+  }
+
+  Future<void> _scan() async {
+    if (_scanning) return;
+    final source = await showModalBottomSheet<ScanSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
+              child: Text('Scan struk', style: ctx.text.titleLarge),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text('Foto struk lurus dari atas, cukup terang, dan seluruh bagian TOTAL terlihat.',
+                  style: ctx.text.bodySmall),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Ambil foto'),
+              onTap: () => Navigator.pop(ctx, ScanSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Pilih dari galeri'),
+              onTap: () => Navigator.pop(ctx, ScanSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    setState(() => _scanning = true);
+    ScanOutcome? out;
+    try {
+      out = await const ReceiptScanner().scan(source);
+    } catch (e) {
+      if (mounted) toast(context, 'Gagal membaca struk. Coba foto ulang dengan cahaya lebih terang.');
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+    if (out == null || !mounted) return;
+    ReceiptScanner.discard(out.imagePath);
+    _applyScan(out.result);
+  }
+
+  void _applyScan(ReceiptResult r) {
+    if (r.isEmpty || r.total == null) {
+      toast(context, 'Nominal tidak terbaca. Isi manual ya.');
+      if (r.isEmpty) return;
+    }
+    setState(() {
+      if (_type != TxnType.expense) {
+        _type = TxnType.expense;
+        if (!_store.expenseCategories.any((c) => c.id == _categoryId)) _categoryId = null;
+        _goalId = null;
+      }
+      if (r.total != null) _amount.text = groupDigits(r.total!);
+      if (r.merchant != null && _note.text.trim().isEmpty) _note.text = r.merchant!;
+      if (r.date != null) {
+        final n = _store.now;
+        _date = DateTime(r.date!.year, r.date!.month, r.date!.day,
+            dateOnly(r.date!) == dateOnly(n) ? n.hour : 12, dateOnly(r.date!) == dateOnly(n) ? n.minute : 0);
+      }
+      if (r.categoryName != null) {
+        final c = _store.expenseCategories.where((c) => c.name == r.categoryName).firstOrNull;
+        if (c != null) _categoryId = c.id;
+      }
+      _scanConfident = r.confident;
+      _scanInfo = [
+        if (r.merchant != null) r.merchant!,
+        if (r.total != null) rupiah(r.total!),
+        if (r.date != null) fmtDate(r.date!),
+      ].join(' · ');
+    });
   }
 
   @override
@@ -254,6 +349,12 @@ class _TxnFormPageState extends State<TxnFormPage> {
       appBar: AppBar(
         title: Text(widget.edit == null ? 'Catat Transaksi' : 'Ubah Transaksi'),
         actions: [
+          if (widget.edit == null)
+            IconButton(
+              tooltip: 'Scan struk',
+              onPressed: _scanning ? null : _scan,
+              icon: const Icon(Icons.document_scanner_rounded),
+            ),
           if (widget.edit != null)
             IconButton(
               tooltip: 'Hapus',
@@ -277,6 +378,15 @@ class _TxnFormPageState extends State<TxnFormPage> {
               selected: {_type},
               onSelectionChanged: (s) => _setType(s.first),
             ),
+            if (widget.edit == null && _type == TxnType.expense) ...[
+              const SizedBox(height: 12),
+              _ScanBanner(
+                scanning: _scanning,
+                info: _scanInfo,
+                confident: _scanConfident,
+                onScan: _scan,
+              ),
+            ],
             const SizedBox(height: 20),
             MoneyField(
               controller: _amount,
@@ -385,6 +495,64 @@ class _TxnFormPageState extends State<TxnFormPage> {
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.check_rounded),
             label: Text(widget.edit == null ? 'Simpan' : 'Simpan perubahan'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanBanner extends StatelessWidget {
+  const _ScanBanner({required this.scanning, required this.info, required this.confident, required this.onScan});
+  final bool scanning;
+  final String? info;
+  final bool confident;
+  final VoidCallback onScan;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final hasResult = info != null;
+    final color = hasResult && !confident ? context.palette.warning : c.primary;
+    return Material(
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: scanning ? null : onScan,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              if (scanning)
+                SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: color))
+              else
+                Icon(hasResult ? (confident ? Icons.check_circle_rounded : Icons.help_rounded) : Icons.document_scanner_rounded,
+                    color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scanning
+                          ? 'Membaca struk…'
+                          : hasResult
+                              ? (confident ? 'Hasil scan — cek lagi sebelum simpan' : 'Total ditebak — mohon dicek')
+                              : 'Malas ngetik? Scan struk',
+                      style: context.text.titleSmall,
+                    ),
+                    Text(
+                      hasResult && !scanning ? info! : 'Nominal, tanggal, dan toko terisi otomatis',
+                      style: context.text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (!scanning) Icon(hasResult ? Icons.refresh_rounded : Icons.chevron_right_rounded, color: color),
+            ],
           ),
         ),
       ),

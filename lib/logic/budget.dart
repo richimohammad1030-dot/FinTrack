@@ -26,6 +26,10 @@ class PeriodSummary {
   /// Pengeluaran riil per hari (kunci = tanggal tanpa jam).
   final Map<DateTime, int> daily;
 
+  /// Uang masuk / keluar karena hutang-piutang (bukan pemasukan/pengeluaran).
+  final int debtIn;
+  final int debtOut;
+
   const PeriodSummary({
     required this.period,
     required this.income,
@@ -34,10 +38,13 @@ class PeriodSummary {
     required this.byCategory,
     required this.incomeByCategory,
     required this.daily,
+    this.debtIn = 0,
+    this.debtOut = 0,
   });
 
-  /// Sisa uang periode ini: pemasukan - pengeluaran - tabungan.
-  int get net => income - expense - saving;
+  /// Sisa uang periode ini: pemasukan − pengeluaran − tabungan, ditambah
+  /// arus hutang (pinjam = masuk, bayar hutang = keluar).
+  int get net => income - expense - saving + debtIn - debtOut;
 
   int spentOn(DateTime day) => daily[dateOnly(day)] ?? 0;
   int spentIn(int categoryId) => byCategory[categoryId] ?? 0;
@@ -47,7 +54,7 @@ class PeriodSummary {
     PayPeriod period,
     Set<int> savingCategoryIds,
   ) {
-    var income = 0, expense = 0, saving = 0;
+    var income = 0, expense = 0, saving = 0, debtIn = 0, debtOut = 0;
     final byCat = <int, int>{};
     final incomeByCat = <int, int>{};
     final daily = <DateTime, int>{};
@@ -69,6 +76,10 @@ class PeriodSummary {
           }
         case TxnType.transfer:
           break;
+        case TxnType.debtIn:
+          debtIn += t.amount;
+        case TxnType.debtOut:
+          debtOut += t.amount;
       }
     }
     return PeriodSummary(
@@ -79,6 +90,8 @@ class PeriodSummary {
       byCategory: byCat,
       incomeByCategory: incomeByCat,
       daily: daily,
+      debtIn: debtIn,
+      debtOut: debtOut,
     );
   }
 }

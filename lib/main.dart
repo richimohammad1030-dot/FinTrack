@@ -1,4 +1,4 @@
-// FinTrack — pencatat keuangan pribadi berbasis pos anggaran & siklus gajian.
+// KAIT — Kelola Arus Keuangan: pencatat keuangan pribadi berbasis pos anggaran & siklus gajian.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,12 +25,14 @@ Future<void> main() async {
   final db = await AppDatabase.open();
   final store = FinanceStore(db: db, settings: settings, notifier: notifier);
 
-  await Future.wait([security.init(), notifier.init(), store.load()]);
+  // Notifikasi disiapkan dulu supaya pengingat hutang bisa dijadwalkan saat load.
+  await notifier.init();
+  await Future.wait([security.init(), store.load()]);
   if (settings.onboarded && settings.dailyReminder) {
     notifier.scheduleDailyReminder(settings.reminderTime);
   }
 
   if (settings.secureScreen) applySecureScreen(true);
 
-  runApp(FinTrackApp(settings: settings, store: store, security: security, notifier: notifier));
+  runApp(KaitApp(settings: settings, store: store, security: security, notifier: notifier));
 }

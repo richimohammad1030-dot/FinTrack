@@ -2,7 +2,8 @@
 
 import 'package:flutter/material.dart';
 
-const _seed = Color(0xFF0E9F6E);
+// Warna merek KAIT: navy (#011B38) + hijau (#2FD48A).
+const _seed = Color(0xFF12A26B);
 const fontFamily = 'PlusJakartaSans';
 
 /// Warna semantik tambahan (pemasukan, pengeluaran, tabungan, peringatan).
@@ -35,8 +36,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     warning: Color(0xFFD97706),
     border: Color(0xFFE6E8EC),
     muted: Color(0xFF6B7280),
-    heroStart: Color(0xFF047857),
-    heroEnd: Color(0xFF0E9F6E),
+    heroStart: Color(0xFF011B38),
+    heroEnd: Color(0xFF0B3F5C),
   );
 
   static const dark = AppPalette(
@@ -46,8 +47,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     warning: Color(0xFFFBBF24),
     border: Color(0xFF242A29),
     muted: Color(0xFF9CA3AF),
-    heroStart: Color(0xFF065F46),
-    heroEnd: Color(0xFF0B7A56),
+    heroStart: Color(0xFF0A2A4A),
+    heroEnd: Color(0xFF0E4A5E),
   );
 
   @override

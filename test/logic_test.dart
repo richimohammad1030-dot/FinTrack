@@ -1,7 +1,7 @@
-import 'package:fintrack/data/models.dart';
-import 'package:fintrack/logic/budget.dart';
-import 'package:fintrack/logic/period.dart';
-import 'package:fintrack/logic/recurring.dart';
+import 'package:kait/data/models.dart';
+import 'package:kait/logic/budget.dart';
+import 'package:kait/logic/period.dart';
+import 'package:kait/logic/recurring.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Txn exp(int amount, DateTime date, {int cat = 1}) =>

@@ -3,9 +3,9 @@
 
 import 'dart:io';
 
-import 'package:fintrack/app.dart';
-import 'package:fintrack/services/security.dart';
-import 'package:fintrack/state/settings.dart';
+import 'package:kait/app.dart';
+import 'package:kait/services/security.dart';
+import 'package:kait/state/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -36,9 +36,13 @@ void main() {
       s.themeMode = dark ? ThemeMode.dark : ThemeMode.light;
       final security = SecurityService(store: MemorySecretStore());
       await security.init();
-      app = FinTrackApp(settings: s, store: store, security: security, notifier: notifier);
+      app = KaitApp(settings: s, store: store, security: security, notifier: notifier);
     });
     await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    // Logo (Image.asset) perlu didekode di luar fake-async supaya tampil di screenshot.
+    await tester.runAsync(() => precacheImage(
+        const AssetImage('assets/brand/kait_icon.png'), tester.element(find.byType(MaterialApp))));
     await tester.pumpAndSettle();
     return settings;
   }
@@ -88,10 +92,21 @@ void main() {
     await tester.tap(find.text('Target Tabungan'));
     await tester.pumpAndSettle();
     await shot(tester, '09-target');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hutang & Piutang'));
+    await tester.pumpAndSettle();
+    await shot(tester, '12-hutang');
+    await tester.tap(find.text('Kredivo'));
+    await tester.pumpAndSettle();
+    await shot(tester, '13-hutang-detail');
   }, skip: !_enabled);
 
   testWidgets('screens-onboarding', (tester) async {
     await pumpApp(tester, demo: false);
+    await shot(tester, '10-onboarding-0');
+    await tester.tap(find.text('Mulai'));
+    await tester.pumpAndSettle();
     await shot(tester, '10-onboarding-1');
     await tester.tap(find.text('Lanjut'));
     await tester.pumpAndSettle();

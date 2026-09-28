@@ -13,8 +13,8 @@ import 'ui/lock/pin_pad.dart';
 import 'ui/onboarding/onboarding_screen.dart';
 import 'ui/shell.dart';
 
-class FinTrackApp extends StatelessWidget {
-  const FinTrackApp({
+class KaitApp extends StatelessWidget {
+  const KaitApp({
     super.key,
     required this.settings,
     required this.store,
@@ -39,7 +39,7 @@ class FinTrackApp extends StatelessWidget {
       ],
       child: Consumer<Settings>(
         builder: (context, s, _) => MaterialApp(
-          title: 'FinTrack',
+          title: 'KAIT',
           debugShowCheckedModeBanner: false,
           theme: buildTheme(Brightness.light),
           darkTheme: buildTheme(Brightness.dark),

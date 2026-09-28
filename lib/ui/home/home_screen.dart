@@ -12,11 +12,13 @@ import '../../logic/period.dart';
 import '../../state/finance_store.dart';
 import '../../state/settings.dart';
 import '../budget/budget_screen.dart';
+import '../debt/debt_screen.dart';
 import '../more/goals_screen.dart';
 import '../more/recurring_screen.dart';
 import '../more/settings_screen.dart';
 import '../txn/txn_form.dart';
 import '../txn/txn_tile.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -44,15 +46,23 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
                 child: Row(
                   children: [
+                    const KaitLogo(size: 40),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(_greeting(store.now), style: context.text.bodyMedium?.copyWith(color: context.palette.muted)),
                           const SizedBox(height: 2),
-                          Text('Periode ${fmtPeriod(period)}', style: context.text.titleLarge),
+                          Text(fmtPeriod(period),
+                              style: context.text.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      tooltip: 'Scan struk',
+                      onPressed: () => openTxnForm(context, scan: true),
+                      icon: const Icon(Icons.document_scanner_rounded),
                     ),
                     IconButton(
                       tooltip: settings.hideAmounts ? 'Tampilkan nominal' : 'Sembunyikan nominal',
@@ -81,6 +91,12 @@ class HomeScreen extends StatelessWidget {
               child: SectionHeader('Pos anggaran', action: 'Semua', onAction: () => onOpenTab(2)),
             ),
             SliverToBoxAdapter(child: _PosOverview(statuses: store.currentStatuses)),
+            if (store.activeDebts.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: SectionHeader('Hutang & piutang', action: 'Kelola', onAction: () => openDebts(context)),
+              ),
+              SliverToBoxAdapter(child: _DebtSummary(store: store)),
+            ],
             if (store.activeGoals.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: SectionHeader('Target tabungan',
@@ -189,7 +205,7 @@ class _TodayCard extends StatelessWidget {
             const SizedBox(height: 14),
             Bar(
               ratio: budget.ratio,
-              color: Colors.white,
+              color: over ? Colors.white : const Color(0xFF3DDC97),
               background: Colors.white.withValues(alpha: 0.22),
               height: 8,
             ),
@@ -463,6 +479,43 @@ class _PosRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DebtSummary extends StatelessWidget {
+  const _DebtSummary({required this.store});
+  final FinanceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final due = store.dueSoonDebts();
+    Widget fig(String label, int v, Color c) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: context.text.bodySmall),
+              const SizedBox(height: 2),
+              Money(v, style: context.text.titleMedium, color: v > 0 ? c : null),
+            ],
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          AppCard(
+            onTap: () => openDebts(context),
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              fig('Sisa hutang saya', store.totalPayable, debtColor(context, DebtKind.payable)),
+              fig('Piutang belum kembali', store.totalReceivable, debtColor(context, DebtKind.receivable)),
+            ]),
+          ),
+          for (final s in due.take(2))
+            Padding(padding: const EdgeInsets.only(top: 8), child: DebtCard(status: s, compact: true)),
+        ],
       ),
     );
   }

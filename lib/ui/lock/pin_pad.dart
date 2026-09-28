@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../services/security.dart';
 import '../../state/settings.dart';
+import '../widgets/brand.dart';
 
 class PinPad extends StatefulWidget {
   const PinPad({
@@ -82,7 +83,7 @@ class _PinPadState extends State<PinPad> with SingleTickerProviderStateMixin {
       return Column(
         children: [
           const Spacer(),
-          Icon(Icons.lock_rounded, size: 40, color: c.primary),
+          const KaitLogo(size: 56),
           const SizedBox(height: 16),
           Text(widget.title, style: context.text.titleLarge, textAlign: TextAlign.center),
           if (widget.subtitle != null) ...[
@@ -278,7 +279,7 @@ class _LockScreenState extends State<LockScreen> {
       body: SafeArea(
         child: PinPad(
           title: 'Masukkan PIN',
-          subtitle: 'FinTrack terkunci untuk melindungi datamu',
+          subtitle: 'KAIT terkunci untuk melindungi datamu',
           error: _error,
           onCompleted: _check,
           onBiometric: _bioAvailable ? _biometric : null,
@@ -336,7 +337,7 @@ class _CreatePinScreenState extends State<_CreatePinScreen> {
         child: PinPad(
           key: ValueKey(_first == null),
           title: _first == null ? 'Buat PIN 6 digit' : 'Ulangi PIN',
-          subtitle: _first == null ? 'PIN dipakai untuk membuka FinTrack' : 'Masukkan PIN yang sama sekali lagi',
+          subtitle: _first == null ? 'PIN dipakai untuk membuka KAIT' : 'Masukkan PIN yang sama sekali lagi',
           error: _error,
           onCompleted: _onPin,
         ),

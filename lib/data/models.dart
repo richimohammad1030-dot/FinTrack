@@ -1,8 +1,18 @@
-// Model data FinTrack.
+// Model data KAIT.
 // Semua nominal disimpan sebagai int (rupiah penuh) supaya tidak ada error
 // pembulatan seperti pada double.
 
-enum TxnType { expense, income, transfer }
+enum TxnType {
+  expense,
+  income,
+  transfer,
+
+  /// Uang MASUK karena hutang: meminjam uang, atau piutang dibayar balik.
+  debtIn,
+
+  /// Uang KELUAR karena hutang: membayar hutang, atau meminjamkan uang.
+  debtOut,
+}
 
 extension TxnTypeX on TxnType {
   String get key => name;
@@ -12,7 +22,13 @@ extension TxnTypeX on TxnType {
         TxnType.expense => 'Pengeluaran',
         TxnType.income => 'Pemasukan',
         TxnType.transfer => 'Transfer',
+        TxnType.debtIn => 'Hutang masuk',
+        TxnType.debtOut => 'Hutang keluar',
       };
+  bool get isDebt => this == TxnType.debtIn || this == TxnType.debtOut;
+
+  /// Menambah saldo dompet?
+  bool get isInflow => this == TxnType.income || this == TxnType.debtIn;
 }
 
 enum PosKind { expense, income }
@@ -198,6 +214,9 @@ class Txn {
   /// Target tabungan yang diisi (khusus setoran ke pos tabungan).
   final int? goalId;
   final int? recurringId;
+
+  /// Hutang/piutang terkait (khusus debtIn / debtOut).
+  final int? debtId;
   final DateTime date;
   final String note;
   final DateTime createdAt;
@@ -211,11 +230,13 @@ class Txn {
     this.toWalletId,
     this.goalId,
     this.recurringId,
+    this.debtId,
     required this.date,
     this.note = '',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  bool get isDebt => type.isDebt;
   bool get isExpense => type == TxnType.expense;
   bool get isIncome => type == TxnType.income;
   bool get isTransfer => type == TxnType.transfer;
@@ -229,6 +250,7 @@ class Txn {
         toWalletId: m['to_wallet_id'] as int?,
         goalId: m['goal_id'] as int?,
         recurringId: m['recurring_id'] as int?,
+        debtId: m['debt_id'] as int?,
         date: DateTime.parse(m['date'] as String),
         note: m['note'] as String? ?? '',
         createdAt: _parseDate(m['created_at']) ?? DateTime.now(),
@@ -243,6 +265,7 @@ class Txn {
         'to_wallet_id': toWalletId,
         'goal_id': goalId,
         'recurring_id': recurringId,
+        'debt_id': debtId,
         'date': date.toIso8601String(),
         'note': note,
         'created_at': createdAt.toIso8601String(),
@@ -257,6 +280,7 @@ class Txn {
         toWalletId: toWalletId,
         goalId: goalId,
         recurringId: recurringId,
+        debtId: debtId,
         date: date,
         note: note,
         createdAt: createdAt,
@@ -327,6 +351,9 @@ class Recurring {
   final bool active;
   final String note;
 
+  /// Cicilan hutang/piutang terkait (type debtOut / debtIn).
+  final int? debtId;
+
   const Recurring({
     this.id,
     required this.title,
@@ -339,6 +366,7 @@ class Recurring {
     this.autoRecord = true,
     this.active = true,
     this.note = '',
+    this.debtId,
   });
 
   factory Recurring.fromMap(Map<String, Object?> m) => Recurring(
@@ -353,6 +381,7 @@ class Recurring {
         autoRecord: _b(m['auto_record']),
         active: _b(m['active']),
         note: m['note'] as String? ?? '',
+        debtId: m['debt_id'] as int?,
       );
 
   Map<String, Object?> toMap() => {
@@ -367,6 +396,7 @@ class Recurring {
         'auto_record': autoRecord ? 1 : 0,
         'active': active ? 1 : 0,
         'note': note,
+        'debt_id': debtId,
       };
 
   Recurring copyWith({
@@ -394,5 +424,119 @@ class Recurring {
         autoRecord: autoRecord ?? this.autoRecord,
         active: active ?? this.active,
         note: note ?? this.note,
+        debtId: debtId,
       );
+}
+
+// ── Hutang & piutang ────────────────────────────────────────────────────────
+
+enum DebtKind {
+  /// Saya berhutang ke orang lain / lembaga.
+  payable,
+
+  /// Orang lain berhutang ke saya.
+  receivable,
+}
+
+class Debt {
+  final int? id;
+  final DebtKind kind;
+
+  /// Nama orang / lembaga (mis. "Budi", "Kredivo", "KPR BTN").
+  final String name;
+
+  /// Jumlah awal yang dicatat TANPA mutasi dompet (hutang lama sebelum
+  /// memakai aplikasi). Pinjaman yang uangnya masuk/keluar dompet dicatat
+  /// sebagai transaksi debtIn/debtOut.
+  final int principal;
+  final DateTime startDate;
+  final DateTime? dueDate;
+  final String note;
+
+  /// Ditutup manual (mis. diikhlaskan / dihapus sisanya).
+  final bool closed;
+  final DateTime createdAt;
+
+  Debt({
+    this.id,
+    required this.kind,
+    required this.name,
+    this.principal = 0,
+    required this.startDate,
+    this.dueDate,
+    this.note = '',
+    this.closed = false,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  bool get isPayable => kind == DebtKind.payable;
+
+  /// Tipe transaksi yang MENAMBAH jumlah hutang/piutang.
+  TxnType get increaseType => isPayable ? TxnType.debtIn : TxnType.debtOut;
+
+  /// Tipe transaksi yang MENGURANGI (pembayaran / pelunasan).
+  TxnType get decreaseType => isPayable ? TxnType.debtOut : TxnType.debtIn;
+
+  factory Debt.fromMap(Map<String, Object?> m) => Debt(
+        id: m['id'] as int?,
+        kind: (m['kind'] as String) == 'receivable' ? DebtKind.receivable : DebtKind.payable,
+        name: m['name'] as String,
+        principal: m['principal'] as int? ?? 0,
+        startDate: DateTime.parse(m['start_date'] as String),
+        dueDate: _parseDate(m['due_date']),
+        note: m['note'] as String? ?? '',
+        closed: _b(m['closed']),
+        createdAt: _parseDate(m['created_at']),
+      );
+
+  Map<String, Object?> toMap() => {
+        if (id != null) 'id': id,
+        'kind': kind.name,
+        'name': name,
+        'principal': principal,
+        'start_date': startDate.toIso8601String(),
+        'due_date': dueDate?.toIso8601String(),
+        'note': note,
+        'closed': closed ? 1 : 0,
+        'created_at': createdAt.toIso8601String(),
+      };
+
+  Debt copyWith({
+    String? name,
+    int? principal,
+    DateTime? startDate,
+    DateTime? dueDate,
+    bool clearDueDate = false,
+    String? note,
+    bool? closed,
+  }) =>
+      Debt(
+        id: id,
+        kind: kind,
+        name: name ?? this.name,
+        principal: principal ?? this.principal,
+        startDate: startDate ?? this.startDate,
+        dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+        note: note ?? this.note,
+        closed: closed ?? this.closed,
+        createdAt: createdAt,
+      );
+}
+
+/// Ringkasan status satu hutang/piutang.
+class DebtStatus {
+  final Debt debt;
+
+  /// Total pokok (awal + tambahan pinjaman).
+  final int total;
+
+  /// Sudah dibayar / diterima kembali.
+  final int paid;
+  final DateTime? lastPayment;
+
+  const DebtStatus(this.debt, this.total, this.paid, this.lastPayment);
+
+  int get remaining => total - paid;
+  bool get settled => debt.closed || remaining <= 0;
+  double get ratio => total <= 0 ? 1 : (paid / total).clamp(0, 1).toDouble();
 }

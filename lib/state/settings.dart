@@ -58,6 +58,11 @@ class Settings extends ChangeNotifier {
   int get lockDelaySeconds => _prefs.getInt('lock_delay') ?? 30;
   set lockDelaySeconds(int v) => _set('lock_delay', v);
 
+  /// ID notifikasi pengingat hutang yang sedang terjadwal.
+  List<int> get debtReminderIds =>
+      (_prefs.getStringList('debt_reminder_ids') ?? const []).map(int.parse).toList();
+  set debtReminderIds(List<int> v) => _prefs.setStringList('debt_reminder_ids', [for (final i in v) '$i']);
+
   /// ID dompet yang terakhir dipakai (jadi default di form transaksi).
   int? get lastWalletId => _prefs.getInt('last_wallet');
   set lastWalletId(int? v) => v == null ? _prefs.remove('last_wallet') : _prefs.setInt('last_wallet', v);

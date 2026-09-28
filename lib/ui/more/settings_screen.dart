@@ -15,6 +15,7 @@ import '../../services/secure_screen.dart';
 import '../../state/finance_store.dart';
 import '../../state/settings.dart';
 import '../lock/pin_pad.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -119,6 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (v) async {
                 if (v) await notifier.requestPermission();
                 s.alertsEnabled = v;
+                if (context.mounted) await context.read<FinanceStore>().syncDebtReminders();
               },
             ),
             SwitchListTile(
@@ -231,9 +233,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ]),
           const SizedBox(height: 20),
+          const Center(child: KaitWordmark(size: 36)),
+          const SizedBox(height: 10),
           Center(
-            child: Text('FinTrack 2.0 · data tersimpan hanya di HP ini',
-                style: context.text.bodySmall),
+            child: Text(
+              'KAIT 2.1 · data tersimpan hanya di HP ini\n'
+              'Kelola Arus Keuangan · Kelola Aset & Income · Kelola Duit',
+              style: context.text.bodySmall,
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
@@ -275,7 +283,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final json = await store.exportJson();
       final n = store.now;
-      final name = 'fintrack-backup-${n.year}${_pad2(n.month)}${_pad2(n.day)}.json';
+      final name = 'kait-backup-${n.year}${_pad2(n.month)}${_pad2(n.day)}.json';
       final uri = await FilePicker.saveFile(
         dialogTitle: 'Simpan backup',
         fileName: name,

@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../state/finance_store.dart';
+import '../debt/debt_screen.dart';
 import '../widgets/common.dart';
 import 'txn_form.dart';
 
@@ -28,7 +29,14 @@ class TxnTile extends StatelessWidget {
     final int color;
     final Color amountColor;
     final String subtitle;
-    if (txn.isTransfer) {
+    if (txn.isDebt) {
+      final d = store.debt(txn.debtId);
+      title = debtTxnTitle(txn, d);
+      icon = 'loan';
+      color = d == null ? 0xFF64748B : debtColor(context, d.kind).toARGB32();
+      amountColor = txn.type.isInflow ? p.income : context.colors.onSurface;
+      subtitle = [if (txn.note.isNotEmpty) txn.note, wallet?.name ?? '?'].join(' · ');
+    } else if (txn.isTransfer) {
       final to = store.wallet(txn.toWalletId);
       title = txn.note.isNotEmpty ? txn.note : 'Transfer';
       icon = 'wallet';
@@ -53,7 +61,9 @@ class TxnTile extends StatelessWidget {
     }
 
     return InkWell(
-      onTap: () => openTxnForm(context, edit: txn),
+      onTap: () => txn.isDebt && txn.debtId != null
+          ? openDebtDetail(context, txn.debtId!)
+          : openTxnForm(context, edit: txn),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -80,7 +90,7 @@ class TxnTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Money(
-              txn.isExpense ? -txn.amount : txn.amount,
+              txn.isExpense || txn.type == TxnType.debtOut ? -txn.amount : txn.amount,
               signed: !txn.isTransfer,
               color: amountColor,
               style: context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),

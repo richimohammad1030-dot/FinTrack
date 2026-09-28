@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../core/format.dart';
 import '../../state/finance_store.dart';
+import '../debt/debt_screen.dart';
 import '../widgets/common.dart';
 import 'goals_screen.dart';
 import 'recurring_screen.dart';
@@ -66,6 +68,11 @@ class MoreScreen extends StatelessWidget {
               children: [
                 tile(Icons.account_balance_wallet_rounded, const Color(0xFF2A78D6), 'Dompet & Rekening',
                     '${store.activeWallets.length} dompet · transfer antar dompet', const WalletsScreen()),
+                tile(Icons.handshake_rounded, context.palette.expense, 'Hutang & Piutang',
+                    store.activeDebts.isEmpty
+                        ? 'Catat pinjaman, cicilan, dan pelunasan'
+                        : 'Hutang ${compactRupiah(store.totalPayable)} · piutang ${compactRupiah(store.totalReceivable)}',
+                    const DebtsScreen()),
                 tile(Icons.flag_rounded, context.palette.saving, 'Target Tabungan',
                     '${store.activeGoals.length} target aktif', const GoalsScreen()),
                 tile(Icons.event_repeat_rounded, const Color(0xFFEB6834), 'Transaksi Rutin',
