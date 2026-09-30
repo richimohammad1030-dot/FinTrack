@@ -35,6 +35,9 @@ KAIT adalah aplikasi Android (Flutter) untuk mencatat pemasukan & pengeluaran pr
 - **Target tabungan** — progres, tenggat, dan saran setoran per bulan.
 - **Laporan** — donat per pos, grafik pengeluaran harian vs jatah, perbandingan dengan periode lalu,
   rasio menabung, pengeluaran terbesar.
+- **Laporan harian & kalender** — kalender per periode gajian dengan pengeluaran tiap hari dan status
+  (aman / hampir / lewat jatah); ketuk tanggal untuk rincian per pos dan daftar transaksinya.
+- **Cara hitung batas harian** — ketuk kartu "Aman dipakai hari ini" untuk melihat rincian angkanya.
 - **Aman** — kunci PIN 6 digit (hash + salt di Android Keystore), sidik jari, kunci otomatis saat
   ditinggal, mode sembunyikan nominal. Semua data hanya di HP (SQLite), tanpa server.
 - **Backup / restore** ke file JSON (bisa disimpan ke Google Drive).

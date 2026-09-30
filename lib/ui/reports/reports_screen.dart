@@ -15,6 +15,7 @@ import '../../state/finance_store.dart';
 import '../txn/txn_tile.dart';
 import '../widgets/common.dart';
 import '../widgets/period_switcher.dart';
+import 'daily_calendar.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -34,34 +35,53 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final s = store.summaryFor(period);
     final prev = store.summaryFor(period.previous);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Laporan')),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 100),
-        children: [
-          PeriodSwitcher(
-            period: period,
-            current: store.currentPeriod,
-            onChanged: (p) => setState(() => _period = p),
-          ),
-          _SummaryCard(summary: s),
-          const SectionHeader('Ke mana uangmu pergi?'),
-          _WhereItWent(summary: s, previous: prev),
-          const SectionHeader('Pengeluaran harian'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text('Hanya pos harian. Pos bulanan (kos, tagihan, dll.) dipantau lewat batas posnya.',
-                style: context.text.bodySmall),
-          ),
-          _DailyChart(summary: s, categories: store.categories, now: store.now),
-          _Insights(summary: s, previous: prev, now: store.now),
-          if (s.incomeByCategory.isNotEmpty) ...[
-            const SectionHeader('Sumber pemasukan'),
-            _IncomeList(summary: s),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Laporan'),
+          bottom: const TabBar(tabs: [Tab(text: 'Ringkasan'), Tab(text: 'Harian')]),
+        ),
+        body: Column(
+          children: [
+            PeriodSwitcher(
+              period: period,
+              current: store.currentPeriod,
+              onChanged: (p) => setState(() => _period = p),
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  ListView(
+                    padding: const EdgeInsets.only(bottom: 100),
+                    children: [
+                      _SummaryCard(summary: s),
+                      const SectionHeader('Ke mana uangmu pergi?'),
+                      _WhereItWent(summary: s, previous: prev),
+                      const SectionHeader('Pengeluaran harian'),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: Text(
+                            'Hanya pos harian. Pos bulanan (kos, tagihan, dll.) dipantau lewat batas posnya. '
+                            'Rincian per hari ada di tab Harian.',
+                            style: context.text.bodySmall),
+                      ),
+                      _DailyChart(summary: s, categories: store.categories, now: store.now),
+                      _Insights(summary: s, previous: prev, now: store.now),
+                      if (s.incomeByCategory.isNotEmpty) ...[
+                        const SectionHeader('Sumber pemasukan'),
+                        _IncomeList(summary: s),
+                      ],
+                      const SectionHeader('Pengeluaran terbesar'),
+                      _TopExpenses(period: period),
+                    ],
+                  ),
+                  DailyCalendarTab(period: period),
+                ],
+              ),
+            ),
           ],
-          const SectionHeader('Pengeluaran terbesar'),
-          _TopExpenses(period: period),
-        ],
+        ),
       ),
     );
   }

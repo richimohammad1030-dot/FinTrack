@@ -11,6 +11,7 @@ import '../../logic/period.dart';
 import '../../state/finance_store.dart';
 import '../txn/txn_tile.dart';
 import '../widgets/common.dart';
+import '../reports/daily_calendar.dart';
 import '../widgets/period_switcher.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -101,6 +102,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 _query = '';
               }
             }),
+          ),
+          IconButton(
+            tooltip: 'Kalender harian',
+            icon: const Icon(Icons.calendar_month_rounded),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DailyCalendarPage())),
           ),
           IconButton(
             tooltip: 'Filter',

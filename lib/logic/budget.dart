@@ -121,12 +121,16 @@ class DailyBudget {
   final int daysLeft;
   final bool isManual;
 
+  /// Pengeluaran pos harian di periode ini SEBELUM hari ini.
+  final int spentBefore;
+
   const DailyBudget({
     required this.allowance,
     required this.spentToday,
     required this.periodBudget,
     required this.daysLeft,
     required this.isManual,
+    this.spentBefore = 0,
   });
 
   int get remainingToday => allowance - spentToday;
@@ -150,6 +154,10 @@ class DailyBudget {
     final daysLeft = period.daysLeft(t);
 
     final budget = periodBudgetFor(summary, categories);
+    var spentBefore = 0;
+    summary.daily.forEach((day, v) {
+      if (day.isBefore(t)) spentBefore += v;
+    });
     if (manualLimit > 0) {
       return DailyBudget(
         allowance: manualLimit,
@@ -157,12 +165,9 @@ class DailyBudget {
         periodBudget: budget,
         daysLeft: daysLeft,
         isManual: true,
+        spentBefore: spentBefore,
       );
     }
-    var spentBefore = 0;
-    summary.daily.forEach((day, v) {
-      if (day.isBefore(t)) spentBefore += v;
-    });
     final left = budget - spentBefore;
     var allowance = daysLeft > 0 && left > 0 ? left ~/ daysLeft : 0;
     // Bulatkan ke bawah ke kelipatan 500 biar enak dibaca.
@@ -173,6 +178,7 @@ class DailyBudget {
       periodBudget: budget,
       daysLeft: daysLeft,
       isManual: false,
+      spentBefore: spentBefore,
     );
   }
 }
@@ -181,20 +187,45 @@ class DailyBudget {
 /// (makan, transport, jajan…). Pos bulanan seperti kos & tagihan tidak ikut.
 /// Kalau pos harian belum diberi batas, pakai: pemasukan − tabungan − pos
 /// bulanan (batasnya, atau yang sudah terpakai kalau lebih besar).
-int periodBudgetFor(PeriodSummary summary, List<Pos> categories) {
-  var dailyLimits = 0, reserved = 0;
-  for (final c in categories) {
-    if (!c.isExpense || c.archived) continue;
-    if (c.isDaily) {
-      dailyLimits += c.monthlyLimit;
-    } else {
-      final spent = c.id == null ? 0 : summary.spentIn(c.id!);
-      reserved += c.monthlyLimit > spent ? c.monthlyLimit : spent;
+int periodBudgetFor(PeriodSummary summary, List<Pos> categories) =>
+    BudgetBreakdown.of(summary, categories).total;
+
+/// Rincian dari mana angka anggaran harian berasal (untuk ditampilkan).
+class BudgetBreakdown {
+  /// Pos harian beserta batasnya.
+  final List<(Pos, int)> dailyPos;
+
+  /// Pos bulanan & tabungan beserta angka yang disisihkan (batas atau
+  /// terpakai, mana yang lebih besar). Hanya dipakai saat [usesFallback].
+  final List<(Pos, int)> reservedPos;
+  final int income;
+  final bool usesFallback;
+  final int total;
+
+  const BudgetBreakdown._(this.dailyPos, this.reservedPos, this.income, this.usesFallback, this.total);
+
+  static BudgetBreakdown of(PeriodSummary summary, List<Pos> categories) {
+    final daily = <(Pos, int)>[];
+    final reserved = <(Pos, int)>[];
+    var dailyLimits = 0, reservedSum = 0;
+    for (final c in categories) {
+      if (!c.isExpense || c.archived) continue;
+      if (c.isDaily) {
+        daily.add((c, c.monthlyLimit));
+        dailyLimits += c.monthlyLimit;
+      } else {
+        final spent = c.id == null ? 0 : summary.spentIn(c.id!);
+        final v = c.monthlyLimit > spent ? c.monthlyLimit : spent;
+        if (v > 0) reserved.add((c, v));
+        reservedSum += v;
+      }
     }
+    if (dailyLimits > 0) {
+      return BudgetBreakdown._(daily, reserved, summary.income, false, dailyLimits);
+    }
+    final fallback = summary.income - reservedSum;
+    return BudgetBreakdown._(daily, reserved, summary.income, true, fallback > 0 ? fallback : 0);
   }
-  if (dailyLimits > 0) return dailyLimits;
-  final fallback = summary.income - reserved;
-  return fallback > 0 ? fallback : 0;
 }
 
 class PosStatus {

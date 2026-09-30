@@ -11,6 +11,7 @@ import '../data/database.dart';
 import '../data/models.dart';
 import '../data/seed.dart';
 import '../logic/budget.dart';
+import '../logic/daily_report.dart';
 import '../logic/period.dart';
 import '../logic/recurring.dart';
 import '../services/notifications.dart';
@@ -120,6 +121,17 @@ class FinanceStore extends ChangeNotifier {
         summary: currentSummary,
         categories: _categories,
         today: now,
+        manualLimit: settings.manualDailyLimit,
+      );
+
+  /// Laporan per hari (kalender) untuk satu periode.
+  PeriodDailyReport dailyReportFor(PayPeriod p) => PeriodDailyReport.build(
+        period: p,
+        summary: summaryFor(p),
+        txns: _txns,
+        categories: _categories,
+        savingIds: savingCategoryIds,
+        now: now,
         manualLimit: settings.manualDailyLimit,
       );
 

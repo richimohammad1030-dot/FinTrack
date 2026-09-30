@@ -39,11 +39,17 @@ final _dayMonthYear = DateFormat('d MMM yyyy', 'id_ID');
 final _weekdayFull = DateFormat('EEEE, d MMM', 'id_ID');
 final _monthYear = DateFormat('MMMM yyyy', 'id_ID');
 final _time = DateFormat('HH:mm', 'id_ID');
+final _monthShort = DateFormat('MMM', 'id_ID');
+final _fullDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
+final _weekdayShort = DateFormat('EEE, d MMM', 'id_ID');
 
 String fmtDayMonth(DateTime d) => _dayMonth.format(d);
 String fmtDate(DateTime d) => _dayMonthYear.format(d);
 String fmtMonthYear(DateTime d) => _monthYear.format(d);
 String fmtTime(DateTime d) => _time.format(d);
+String fmtMonthShort(DateTime d) => _monthShort.format(d);
+String fmtFullDate(DateTime d) => _fullDate.format(d);
+String fmtWeekdayShort(DateTime d) => _weekdayShort.format(d);
 
 /// "Hari ini", "Kemarin", atau "Senin, 28 Sep".
 String fmtRelativeDay(DateTime d, {DateTime? now}) {
